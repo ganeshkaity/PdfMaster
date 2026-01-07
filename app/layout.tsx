@@ -8,8 +8,8 @@ import { Toaster } from "react-hot-toast";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Allyono Apps - Free Online PDF Tools | Edit, Convert & Compress PDFs",
-  description: "Free online PDF tools for editing, converting, compressing, and managing PDF files. All processing happens locally in your browser - secure, fast, and private. No file size limits.",
+  title: "Free PDF Tools Online – Allyono Apps",
+  description: "Allyono Apps - Free online PDF tools for editing, converting, compressing, and managing PDF files. All processing happens locally in your browser - secure, fast, and private.",
 };
 
 export default function RootLayout({
