@@ -20,7 +20,7 @@ export default function HtmlToPdfPage() {
 
         try {
             const element = previewRef.current;
-            const canvas = await html2canvas(element, { scale: 2 });
+            const canvas = await html2canvas(element, { scale: 2 } as any);
             const imgData = canvas.toDataURL("image/png");
 
             const pdf = new jsPDF({
