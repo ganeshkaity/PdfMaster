@@ -6,7 +6,7 @@ import FileDropZone from "../components/tools/FileDropZone";
 import { FileText, File as FileIcon, Loader2, Download } from "lucide-react";
 import { saveAs } from "file-saver";
 import toast from "react-hot-toast";
-import * => pdfjsLib from "pdfjs-dist";
+import * as pdfjsLib from "pdfjs-dist";
 
 // Worker config
 // Configure worker. Note: In Next.js app router, it's often best to use a CDN or local public file.
