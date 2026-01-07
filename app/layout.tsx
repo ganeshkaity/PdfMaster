@@ -10,6 +10,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Free PDF Tools Online – Allyono Apps",
   description: "Allyono Apps - Free online PDF tools for editing, converting, compressing, and managing PDF files. All processing happens locally in your browser - secure, fast, and private.",
+  other: {
+    "google-adsense-account": "ca-pub-4661155459361916"
+  }
 };
 
 export default function RootLayout({
