@@ -195,12 +195,6 @@ export default function Home() {
               <ToolCard {...tool} />
             </motion.div>
           ))}
-
-          {/* Coming Soon / More Placeholders */}
-          <motion.div variants={item} className="p-6 rounded-2xl border border-dashed border-slate-700/50 flex flex-col items-center justify-center text-center opacity-50 hover:opacity-100 transition-opacity">
-            <span className="text-slate-500 font-medium mb-1">More tools coming soon</span>
-            <span className="text-xs text-slate-600">Excel to PDF, PPT to PDF...</span>
-          </motion.div>
         </motion.div>
       </div>
     </div>
