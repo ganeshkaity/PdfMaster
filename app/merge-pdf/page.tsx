@@ -52,7 +52,7 @@ export default function MergePdfPage() {
             }
 
             const mergedPdfBytes = await mergedPdf.save();
-            const blob = new Blob([mergedPdfBytes], { type: "application/pdf" });
+            const blob = new Blob([mergedPdfBytes as any], { type: "application/pdf" });
             saveAs(blob, `merged-document-${Date.now()}.pdf`);
 
             toast.success("PDFs merged successfully!", { id: loadingToast });
@@ -137,8 +137,8 @@ export default function MergePdfPage() {
                             onClick={handleMerge}
                             disabled={isProcessing || files.length < 2}
                             className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center space-x-2 transition-all shadow-lg ${isProcessing || files.length < 2
-                                    ? "bg-slate-700 text-slate-400 cursor-not-allowed"
-                                    : "bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:shadow-cyan-500/20"
+                                ? "bg-slate-700 text-slate-400 cursor-not-allowed"
+                                : "bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:shadow-cyan-500/20"
                                 }`}
                         >
                             {isProcessing ? (

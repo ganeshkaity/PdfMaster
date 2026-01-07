@@ -51,7 +51,7 @@ export default function CompressPdfPage() {
             // Since pdf-lib save() basically cleans up XRef tables, it often reduces size of messy PDFs.
             const compressedBytes = await pdf.save(options);
 
-            const blob = new Blob([compressedBytes], { type: "application/pdf" });
+            const blob = new Blob([compressedBytes as any], { type: "application/pdf" });
             setResultSize(blob.size);
 
             // Delay to show the "processing" state slightly longer for UX if it's too instant
@@ -113,8 +113,8 @@ export default function CompressPdfPage() {
                                     key={level.id}
                                     onClick={() => setCompressionLevel(level.id as any)}
                                     className={`p-4 rounded-xl border-2 transition-all text-left space-y-1 relative overflow-hidden ${compressionLevel === level.id
-                                            ? "border-cyan-500 bg-cyan-500/10"
-                                            : "border-slate-700 bg-slate-800/30 hover:border-slate-600"
+                                        ? "border-cyan-500 bg-cyan-500/10"
+                                        : "border-slate-700 bg-slate-800/30 hover:border-slate-600"
                                         }`}
                                 >
                                     <div className="relative z-10">

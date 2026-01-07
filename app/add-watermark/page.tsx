@@ -51,7 +51,7 @@ export default function AddWatermarkPage() {
             });
 
             const pdfBytes = await pdf.save();
-            const blob = new Blob([pdfBytes], { type: "application/pdf" });
+            const blob = new Blob([pdfBytes as any], { type: "application/pdf" });
 
             saveAs(blob, `${file.name.replace(".pdf", "")}_watermarked.pdf`);
             toast.success("Watermark added!", { id: loadingToast });

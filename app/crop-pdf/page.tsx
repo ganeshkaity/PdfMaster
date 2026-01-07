@@ -52,7 +52,7 @@ export default function CropPdfPage() {
             });
 
             const pdfBytes = await pdf.save();
-            const blob = new Blob([pdfBytes], { type: "application/pdf" });
+            const blob = new Blob([pdfBytes as any], { type: "application/pdf" });
             saveAs(blob, `${file.name.replace(".pdf", "")}_cropped.pdf`);
             toast.success("PDF Cropped!", { id: loadingToast });
 

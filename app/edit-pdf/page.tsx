@@ -73,7 +73,7 @@ export default function EditPdfPage() {
             }
 
             const pdfBytes = await pdf.save();
-            const blob = new Blob([pdfBytes], { type: "application/pdf" });
+            const blob = new Blob([pdfBytes as any], { type: "application/pdf" });
             saveAs(blob, `${file.name.replace(".pdf", "")}_edited.pdf`);
             toast.success("Edits applied!", { id: loadingToast });
 

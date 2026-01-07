@@ -34,7 +34,7 @@ export default function RotatePdfPage() {
             });
 
             const pdfBytes = await pdf.save();
-            const blob = new Blob([pdfBytes], { type: "application/pdf" });
+            const blob = new Blob([pdfBytes as any], { type: "application/pdf" });
 
             saveAs(blob, `${file.name.replace(".pdf", "")}_rotated.pdf`);
             toast.success("PDF Rotated!", { id: loadingToast });
@@ -88,8 +88,8 @@ export default function RotatePdfPage() {
                                     key={deg}
                                     onClick={() => setRotation(deg)}
                                     className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all w-32 h-32 ${rotation === deg
-                                            ? "border-cyan-500 bg-cyan-500/10 text-white"
-                                            : "border-slate-700 bg-slate-800/30 text-slate-400 hover:border-slate-600 hover:text-white"
+                                        ? "border-cyan-500 bg-cyan-500/10 text-white"
+                                        : "border-slate-700 bg-slate-800/30 text-slate-400 hover:border-slate-600 hover:text-white"
                                         }`}
                                 >
                                     <RotateCw className={`w-8 h-8 mb-2 ${rotation === deg ? "animate-spin-slow" : ""}`} style={{ transform: `rotate(${deg}deg)` }} />
