@@ -45,7 +45,7 @@ export default function FileDropZone({
     return (
         <div className={clsx("w-full", className)}>
             <motion.div
-                {...getRootProps()}
+                {...getRootProps() as any}
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.99 }}
                 className={clsx(
