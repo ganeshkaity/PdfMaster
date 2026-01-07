@@ -19,7 +19,7 @@
 
   /* Glassmorphism */
   --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-bg: rgba(15, 23, 42, 0.85);
+  --glass-bg: rgb(15, 23, 42);
   --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
 }
 
@@ -60,8 +60,6 @@ body {
 /* Glassmorphism Utility Class */
 .glass {
   background: var(--glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
 }
