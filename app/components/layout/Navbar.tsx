@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, ChevronDown, FileText, Settings, Image as ImageIcon, Slice, Move, Shield } from "lucide-react";
@@ -22,12 +23,21 @@ export default function Navbar() {
         <nav className="sticky top-0 z-50 w-full glass border-b border-white/10">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
-                    <Link href="/" className="flex items-center space-x-2 group">
-                        <div className="p-2 bg-gradient-to-tr from-cyan-500 to-blue-500 rounded-lg group-hover:shadow-[0_0_20px_rgba(6,182,212,0.5)] transition-all">
-                            <FileText className="text-white w-6 h-6" />
+                    import Image from "next/image";
+
+                    // ... (existing imports)
+
+                    <Link href="/" className="flex items-center space-x-3 group">
+                        <div className="relative w-10 h-10 overflow-hidden rounded-xl group-hover:shadow-[0_0_20px_rgba(6,182,212,0.5)] transition-all">
+                            <Image
+                                src="/logo.png"
+                                alt="Allyono Apps Logo"
+                                fill
+                                className="object-cover"
+                            />
                         </div>
                         <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-                            PDF<span className="text-cyan-400">Master</span>
+                            Allyono<span className="text-cyan-400">Apps</span>
                         </span>
                     </Link>
 
