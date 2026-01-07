@@ -43,7 +43,7 @@ export default function PdfToPngPage() {
                 canvas.width = viewport.width;
 
                 if (context) {
-                    await page.render({ canvasContext: context, viewport }).promise;
+                    await page.render({ canvas, canvasContext: context, viewport }).promise;
 
                     const blob = await new Promise<Blob | null>((resolve) =>
                         canvas.toBlob(resolve, "image/png")
