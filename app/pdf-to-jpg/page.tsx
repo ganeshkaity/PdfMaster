@@ -1,19 +1,14 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import ToolLayout from "../components/tools/ToolLayout";
 import FileDropZone from "../components/tools/FileDropZone";
 import { Image as ImageIcon, File as FileIcon, Loader2, Download, Layers } from "lucide-react";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import toast from "react-hot-toast";
-import * as pdfjsLib from "pdfjs-dist";
 
-// Configure worker. Note: In Next.js app router, it's often best to use a CDN or local public file.
-// We use unpkg CDN for simplicity and reliability in this setup.
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-
-// Force dynamic rendering (disable static generation) since pdfjs-dist requires browser APIs
+// Force dynamic rendering to prevent SSR
 export const dynamic = 'force-dynamic';
 
 
@@ -22,13 +17,22 @@ export default function PdfToJpgPage() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [pageCount, setPageCount] = useState<number>(0);
     const [progress, setProgress] = useState(0);
+    const pdfjsRef = useRef<any>(null);
+
+    useEffect(() => {
+        // Dynamically import pdfjs-dist only on client side
+        import('pdfjs-dist').then((pdfjs) => {
+            pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+            pdfjsRef.current = pdfjs;
+        });
+    }, []);
 
     const handleFileSelected = async (files: File[]) => {
-        if (files.length > 0) {
+        if (files.length > 0 && pdfjsRef.current) {
             setFile(files[0]);
             try {
                 const buffer = await files[0].arrayBuffer();
-                const pdf = await pdfjsLib.getDocument(buffer).promise;
+                const pdf = await pdfjsRef.current.getDocument(buffer).promise;
                 setPageCount(pdf.numPages);
             } catch (e) {
                 toast.error("Failed to load PDF");
@@ -37,7 +41,7 @@ export default function PdfToJpgPage() {
     };
 
     const handleConvert = async () => {
-        if (!file) return;
+        if (!file || !pdfjsRef.current) return;
 
         setIsProcessing(true);
         setProgress(0);
@@ -45,7 +49,7 @@ export default function PdfToJpgPage() {
 
         try {
             const buffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument(buffer).promise;
+            const pdf = await pdfjsRef.current.getDocument(buffer).promise;
             const zip = new JSZip();
 
             for (let i = 1; i <= pdf.numPages; i++) {

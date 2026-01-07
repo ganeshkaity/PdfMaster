@@ -1,31 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import ToolLayout from "../components/tools/ToolLayout";
 import FileDropZone from "../components/tools/FileDropZone";
 import { Image as ImageIcon, File as FileIcon, Loader2, Download } from "lucide-react";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import toast from "react-hot-toast";
-import * as pdfjsLib from "pdfjs-dist";
 
-// Configure worker locally or via CDN
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-
-// Force dynamic rendering (disable static generation) since pdfjs-dist requires browser APIs
+// Force dynamic rendering to prevent SSR
 export const dynamic = 'force-dynamic';
 
 export default function PdfToPngPage() {
     const [file, setFile] = useState<File | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState(0);
+    const pdfjsRef = useRef<any>(null);
+
+    useEffect(() => {
+        import('pdfjs-dist').then((pdfjs) => {
+            pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+            pdfjsRef.current = pdfjs;
+        });
+    }, []);
 
     const handleFileSelected = (files: File[]) => {
         if (files.length > 0) setFile(files[0]);
     };
 
     const handleConvert = async () => {
-        if (!file) return;
+        if (!file || !pdfjsRef.current) return;
 
         setIsProcessing(true);
         setProgress(0);
@@ -33,7 +37,7 @@ export default function PdfToPngPage() {
 
         try {
             const buffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument(buffer).promise;
+            const pdf = await pdfjsRef.current.getDocument(buffer).promise;
             const zip = new JSZip();
 
             for (let i = 1; i <= pdf.numPages; i++) {
