@@ -94,18 +94,6 @@ const allTools = [
     icon: Grid
   },
   {
-    title: "PowerPoint to PDF",
-    description: "Convert PPT presentations to PDF.",
-    href: "/ppt-to-pdf",
-    icon: FileOutput
-  },
-  {
-    title: "PDF to PowerPoint",
-    description: "Convert PDF content to PPT slides.",
-    href: "/pdf-to-ppt",
-    icon: FileOutput
-  },
-  {
     title: "HTML to PDF",
     description: "Convert Web pages or HTML code to PDF.",
     href: "/html-to-pdf",
