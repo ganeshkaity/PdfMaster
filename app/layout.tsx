@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/layout/Navbar";
+import Footer from "./components/layout/Footer";
 import { Toaster } from "react-hot-toast";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "PDFMaster - Modern PDF Tools",
-  description: "The most beautiful and efficient way to manage your PDF files.",
+  title: "Allyono Apps - Free Online PDF Tools | Edit, Convert & Compress PDFs",
+  description: "Free online PDF tools for editing, converting, compressing, and managing PDF files. All processing happens locally in your browser - secure, fast, and private. No file size limits.",
 };
 
 export default function RootLayout({
@@ -31,6 +32,8 @@ export default function RootLayout({
         <main className="relative z-0">
           {children}
         </main>
+
+        <Footer />
 
         <Toaster
           position="bottom-right"
