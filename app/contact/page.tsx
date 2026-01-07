@@ -99,18 +99,19 @@ export default function ContactPage() {
                         </div>
                     </div>
 
-                    <div className="bg-slate-900/50 rounded-xl p-4 border border-white/5">
-                        <iframe
-                            src="https://forms.gle/pp4jHEHnaE16dSmbA"
-                            width="100%"
-                            height="800"
-                            frameBorder="0"
-                            marginHeight={0}
-                            marginWidth={0}
-                            className="rounded-lg"
+                    <div className="flex flex-col items-center space-y-4 py-12">
+                        <p className="text-slate-300 text-center mb-4">
+                            Click the button below to open our feedback form in a new tab.
+                        </p>
+                        <a
+                            href="https://forms.gle/pp4jHEHnaE16dSmbA"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl font-bold text-lg text-white shadow-lg hover:shadow-cyan-500/20 transition-all space-x-2"
                         >
-                            Loading feedback form...
-                        </iframe>
+                            <MessageSquare className="w-5 h-5" />
+                            <span>Open Feedback Form</span>
+                        </a>
                     </div>
 
                     <p className="text-slate-500 text-sm mt-4 text-center">
