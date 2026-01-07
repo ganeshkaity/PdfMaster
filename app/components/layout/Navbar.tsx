@@ -54,7 +54,7 @@ export default function Navbar() {
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: 10 }}
                                         transition={{ duration: 0.2 }}
-                                        className="absolute left-1/2 -translate-x-1/2 mt-0 w-64 glass rounded-xl border border-white/10 overflow-hidden shadow-2xl"
+                                        className="absolute right-0 top-full mt-2 w-64 glass rounded-xl border border-white/10 overflow-hidden shadow-2xl"
                                     >
                                         <div className="p-2 grid gap-1">
                                             {tools.map((tool) => (
@@ -69,7 +69,7 @@ export default function Navbar() {
                                             ))}
                                             <div className="border-t border-white/10 my-1"></div>
                                             <Link
-                                                href="/all-tools"
+                                                href="."
                                                 className="block px-3 py-2 text-xs text-center text-slate-400 hover:text-white hover:underline"
                                             >
                                                 View all 20+ tools
