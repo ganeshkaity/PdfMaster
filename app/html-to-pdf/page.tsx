@@ -29,7 +29,7 @@ export default function HtmlToPdfPage() {
                 format: "a4",
             });
 
-            const imgProps = pdf.getImageProperties(imgData);
+            const imgProps = (pdf as any).getImageProperties(imgData);
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
