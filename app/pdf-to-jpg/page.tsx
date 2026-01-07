@@ -13,6 +13,9 @@ import * as pdfjsLib from "pdfjs-dist";
 // We use unpkg CDN for simplicity and reliability in this setup.
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
+// Force dynamic rendering (disable static generation) since pdfjs-dist requires browser APIs
+export const dynamic = 'force-dynamic';
+
 
 export default function PdfToJpgPage() {
     const [file, setFile] = useState<File | null>(null);

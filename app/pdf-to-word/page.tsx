@@ -6,10 +6,15 @@ import FileDropZone from "../components/tools/FileDropZone";
 import { FileText, File as FileIcon, Loader2, Download } from "lucide-react";
 import { saveAs } from "file-saver";
 import toast from "react-hot-toast";
-import * as pdfjsLib from "pdfjs-dist";
+import * => pdfjsLib from "pdfjs-dist";
 
 // Worker config
+// Configure worker. Note: In Next.js app router, it's often best to use a CDN or local public file.
+// We use unpkg CDN for simplicity and reliability in this setup.
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
+// Force dynamic rendering (disable static generation) since pdfjs-dist requires browser APIs
+export const dynamic = 'force-dynamic';
 
 export default function PdfToWordPage() {
     const [file, setFile] = useState<File | null>(null);
