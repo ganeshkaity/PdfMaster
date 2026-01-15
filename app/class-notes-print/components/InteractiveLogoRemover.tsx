@@ -180,7 +180,7 @@ export default function InteractiveLogoRemover({ pdf, isOpen, onClose, onApply, 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 pt-24 animate-in fade-in duration-200">
             <div className="bg-slate-900 rounded-2xl border border-white/10 w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
 
                 {/* Header */}

@@ -12,6 +12,9 @@ import { initPdfJs, renderPageToCanvas, applyFiltersToCanvas, FilterOptions, Log
 import { jsPDF } from "jspdf";
 import PageSelector from "./components/PageSelector";
 import InteractiveLogoRemover from "./components/InteractiveLogoRemover";
+import StepsIndicator from "./components/StepsIndicator";
+import ProcessingView from "./components/ProcessingView";
+import SuccessView from "./components/SuccessView";
 
 export default function ClassNotesPrintPage() {
     // Pipeline Steps: 0 = Upload, 1 = Select Pages, 2 = Configure/Preview
@@ -21,7 +24,22 @@ export default function ClassNotesPrintPage() {
     const [pdfRef, setPdfRef] = useState<any>(null);
     const [numPages, setNumPages] = useState(0);
     const [selectedPages, setSelectedPages] = useState<number[]>([]);
-    const [isProcessing, setIsProcessing] = useState(false);
+    // const [isProcessing, setIsProcessing] = useState(false); // Replaced by step 3
+    const [originalFileSize, setOriginalFileSize] = useState(0);
+
+    // Processing State
+    const [progressState, setProgressState] = useState({
+        percent: 0,
+        current: 0,
+        total: 0,
+        estimatedTime: "~ calculating"
+    });
+    // const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false); // Replaced by step 4
+    const [successData, setSuccessData] = useState<{
+        blob: Blob | null;
+        formattedSize: string;
+        pageCount: number;
+    } | null>(null);
 
     // Enhancement / Filters
     const [filters, setFilters] = useState<FilterOptions>({
@@ -34,14 +52,14 @@ export default function ClassNotesPrintPage() {
     // Extra filter for "Black & White" (Pure thresholding, distinct from Grayscale)
     const [isBlackAndWhite, setIsBlackAndWhite] = useState(false);
 
-
     // Layout Controls
     const [layout, setLayout] = useState({
         slidesPerRow: 1,
-        slidesPerCol: 3, // Default to 3 rows as per screenshot
+        slidesPerCol: 1,
         orientation: "portrait" as "portrait" | "landscape",
         pageSize: "a4",
         showSeparationLines: false, // "No" by default
+        stretchSlides: false,
     });
 
     // Logo Removal
@@ -68,6 +86,7 @@ export default function ClassNotesPrintPage() {
         if (files.length === 0) return;
         const selectedFile = files[0];
         setFile(selectedFile);
+        setOriginalFileSize(selectedFile.size);
 
         try {
             const pdfjs = await import("pdfjs-dist");
@@ -135,8 +154,17 @@ export default function ClassNotesPrintPage() {
     // --- Output Generation ---
     const handleProcess = async () => {
         if (!pdfRef || selectedPages.length === 0) return;
-        setIsProcessing(true);
-        const loadingToast = toast.loading("Generating customized PDF...");
+
+        setStep(3); // Go to Processing Step
+        const startTime = Date.now();
+        const total = selectedPages.length;
+
+        setProgressState({
+            percent: 0,
+            current: 0,
+            total,
+            estimatedTime: "~ calculating..."
+        });
 
         try {
             // Orientation switching
@@ -160,20 +188,35 @@ export default function ClassNotesPrintPage() {
 
             let currentSlot = 0;
             const slotsPerPage = numRows * numCols;
+            const activeFilters = { ...filters };
+            if (isBlackAndWhite) {
+                activeFilters.grayscale = true;
+                activeFilters.contrast = 150;
+            }
 
             for (let i = 0; i < selectedPages.length; i++) {
                 const pageNum = selectedPages[i];
+
+                // Update Progress
+                const elapsed = Date.now() - startTime;
+                const avgTimePerItem = elapsed / (i + 1);
+                const remainingItems = total - (i + 1);
+                const remainingSecs = Math.ceil((avgTimePerItem * remainingItems) / 1000);
+
+                setProgressState({
+                    percent: Math.round(((i + 1) / total) * 100),
+                    current: i + 1,
+                    total,
+                    estimatedTime: i === 0 ? "calculating..." : `~${remainingSecs}s remaining`
+                });
+
+                // Yield to main thread to allow UI update
+                await new Promise(resolve => setTimeout(resolve, 0));
 
                 const canvas = await renderPageToCanvas(pdfRef, pageNum, 2.0);
                 if (!canvas) continue;
 
                 // Apply logic
-                const activeFilters = { ...filters };
-                if (isBlackAndWhite) {
-                    activeFilters.grayscale = true;
-                    activeFilters.contrast = 150;
-                }
-
                 const logoOpts = {
                     enabled: isLogoRemovalEnabled,
                     region: logoRegion,
@@ -181,13 +224,11 @@ export default function ClassNotesPrintPage() {
                     fillColor: logoFillColor,
                     blurStrength: logoBlurStrength
                 };
-
                 applyFiltersToCanvas(canvas, activeFilters, logoOpts);
 
                 const imgData = canvas.toDataURL('image/jpeg', 0.85);
 
                 // Slot calculation
-                // Row-major order: (0,0), (0,1)...
                 const slotInPage = currentSlot % slotsPerPage;
                 const rowIndex = Math.floor(slotInPage / numCols);
                 const colIndex = slotInPage % numCols;
@@ -201,11 +242,12 @@ export default function ClassNotesPrintPage() {
                 let finalW = cellWidth;
                 let finalH = cellHeight;
 
-                // If image is wider than cell (relative to ratio), fit width
-                if (imgRatio > cellRatio) {
-                    finalH = finalW / imgRatio;
-                } else {
-                    finalW = finalH * imgRatio;
+                if (!layout.stretchSlides) {
+                    if (imgRatio > cellRatio) {
+                        finalH = finalW / imgRatio;
+                    } else {
+                        finalW = finalH * imgRatio;
+                    }
                 }
 
                 // Center in cell
@@ -221,19 +263,28 @@ export default function ClassNotesPrintPage() {
 
                 currentSlot++;
 
-                // New Page if full, but not after the very last image
                 if (currentSlot % slotsPerPage === 0 && i < selectedPages.length - 1) {
                     doc.addPage();
                 }
             }
 
-            doc.save("class-notes-master.pdf");
-            toast.success("Done!", { id: loadingToast });
+            // Finish processing
+            const blob = doc.output('blob');
+            const finalSize = formatBytes(blob.size);
+            const totalPagesGenerated = doc.getNumberOfPages();
+
+            setSuccessData({
+                blob: blob,
+                formattedSize: finalSize,
+                pageCount: totalPagesGenerated
+            });
+
+            setStep(4); // Go to Success Step
+
         } catch (e) {
             console.error(e);
-            toast.error("Error creating PDF", { id: loadingToast });
-        } finally {
-            setIsProcessing(false);
+            toast.error("Error creating PDF");
+            setStep(2); // Go back to config on error
         }
     };
 
@@ -244,6 +295,10 @@ export default function ClassNotesPrintPage() {
             description="Format lecture slides for printing. Invert colors, remove black backgrounds, and print multiple slides per page."
             icon={<FileText className="w-10 h-10 text-purple-400" />}
         >
+            <StepsIndicator
+                currentStep={step}
+                steps={["Upload PDF", "Select Pages", "Customize", "Processing", "Download"]}
+            />
             {/* Step 0: Upload */}
             {step === 0 && (
                 <div className="max-w-3xl mx-auto space-y-8">
@@ -436,6 +491,40 @@ export default function ClassNotesPrintPage() {
                                     <Layout className="w-5 h-5 text-purple-400" /> Layout
                                 </h3>
 
+                                {/* Visual Layout Preview */}
+                                <div className="bg-slate-950/50 rounded-xl p-6 flex items-center justify-center gap-8 border border-white/5">
+                                    {/* Page Representation */}
+                                    <div
+                                        className="border-2 border-slate-700 bg-slate-900 shadow-xl relative transition-all duration-300 flex-shrink-0"
+                                        style={{
+                                            width: layout.orientation === 'portrait' ? '120px' : '170px',
+                                            height: layout.orientation === 'portrait' ? '170px' : '120px',
+                                            display: 'grid',
+                                            gridTemplateColumns: `repeat(${layout.slidesPerCol}, 1fr)`,
+                                            gridTemplateRows: `repeat(${layout.slidesPerRow}, 1fr)`,
+                                            padding: '6px',
+                                            gap: '4px'
+                                        }}
+                                    >
+                                        {Array.from({ length: layout.slidesPerRow * layout.slidesPerCol }).map((_, i) => (
+                                            <div key={i} className="border border-purple-500/50 bg-purple-500/10 rounded-[2px]" />
+                                        ))}
+                                    </div>
+
+                                    {/* Text Info */}
+                                    <div className="text-center">
+                                        <div className="text-5xl font-bold text-cyan-400 mb-1">
+                                            {layout.slidesPerRow * layout.slidesPerCol}
+                                        </div>
+                                        <div className="text-sm text-slate-300 font-medium">
+                                            {layout.slidesPerRow} × {layout.slidesPerCol} slides
+                                        </div>
+                                        <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">
+                                            per page
+                                        </div>
+                                    </div>
+                                </div>
+
                                 {/* Document Size */}
                                 <div>
                                     <label className="block text-sm font-medium text-slate-300 mb-3">Document Size</label>
@@ -566,48 +655,102 @@ export default function ClassNotesPrintPage() {
                         <div className="flex items-center gap-4">
                             <button
                                 onClick={() => setStep(1)}
-                                className="px-6 py-4 text-slate-400 hover:text-white transition flex items-center justify-center gap-2 hover:bg-white/5 rounded-xl"
+                                className="px-6 py-4 rounded-xl border border-slate-700 text-slate-300 font-medium hover:bg-slate-800 transition"
                             >
-                                <ArrowLeft className="w-5 h-5" />
-                                Back to Selection
+                                Back
                             </button>
-
                             <button
                                 onClick={handleProcess}
-                                disabled={isProcessing}
-                                className="flex-1 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-xl shadow-lg hover:shadow-purple-500/25 transition disabled:opacity-50 flex items-center justify-center gap-3"
+                                className="flex-1 px-6 py-4 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white font-bold text-lg shadow-xl shadow-purple-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
                             >
-                                {isProcessing ? (
-                                    <>
-                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        <span>Processing PDF...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Download className="w-6 h-6" />
-                                        Download Optimized PDF
-                                    </>
-                                )}
+                                <Settings2 className="w-5 h-5" /> Process File
                             </button>
                         </div>
-
                     </div>
                 </div>
             )}
 
-            {/* Step 3: Modals */}
+            {/* Modals */}
+            {/* Step 3: Processing */}
+            {step === 3 && (
+                <ProcessingView
+                    progress={progressState.percent}
+                    currentStep="Optimizing your notes..."
+                    subText={`Processing page ${progressState.current} of ${progressState.total}`}
+                    processedPages={progressState.current}
+                    totalPages={progressState.total}
+                    estimatedTimeRemaining={progressState.estimatedTime}
+                />
+            )}
+
+            {/* Step 4: Success */}
+            {step === 4 && (
+                <SuccessView
+                    fileName={file?.name.replace('.pdf', '_enhanced.pdf') || 'document_enhanced.pdf'}
+                    originalSize={formatBytes(originalFileSize || 0)}
+                    finalSize={successData?.formattedSize || "0 MB"}
+                    pageCount={successData?.pageCount || 0}
+                    onDownload={() => {
+                        if (successData?.blob) {
+                            const url = URL.createObjectURL(successData.blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = file?.name.replace('.pdf', '_class_notes.pdf') || "class-notes.pdf";
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                        }
+                    }}
+                    onPreview={() => {
+                        if (successData?.blob) {
+                            const url = URL.createObjectURL(successData.blob);
+                            window.open(url, '_blank');
+                        }
+                    }}
+                    onProcessAnother={() => {
+                        setStep(0);
+                        setFile(null);
+                        setPdfRef(null);
+                        setSelectedPages([]);
+                        setIsLogoRemovalEnabled(false);
+                        setLogoRegion(undefined);
+                        setLogoBlurStrength(5);
+                        setLayout({
+                            pageSize: 'a4',
+                            orientation: 'portrait',
+                            slidesPerRow: 1, // Reset to default 1
+                            slidesPerCol: 3, // Reset to default 3
+                            showSeparationLines: true,
+                            stretchSlides: false
+                        });
+                        setProgressState({ percent: 0, total: 0, current: 0, estimatedTime: 'N/A' });
+                        setSuccessData(null);
+                        setOriginalFileSize(0);
+                    }}
+                />
+            )}
+
             <InteractiveLogoRemover
                 pdf={pdfRef}
                 isOpen={showLogoModal}
                 onClose={() => setShowLogoModal(false)}
+                initialRegion={logoRegion}
                 onApply={(region) => {
                     setLogoRegion(region);
                     setShowLogoModal(false);
-                    setIsLogoRemovalEnabled(true);
                 }}
-                initialRegion={logoRegion}
             />
-
         </ToolLayout>
     );
+}
+
+// Helper for file size formatting
+function formatBytes(bytes: number, decimals = 2) {
+    if (!+bytes) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
