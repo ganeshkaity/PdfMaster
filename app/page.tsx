@@ -16,6 +16,12 @@ const allTools = [
     icon: Combine
   },
   {
+    title: "Class Notes Print",
+    description: "Optimize slides/notes for printing (invert, grayscale, N-up).",
+    href: "/class-notes-print",
+    icon: FileText
+  },
+  {
     title: "Split PDF",
     description: "Separate one page or a whole set for easy conversion.",
     href: "/split-pdf",
