@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Check, CheckCircle2, Circle, Pencil, RotateCw, Plus } from "lucide-react";
+import { Check, CheckCircle2, Circle, Pencil, RotateCw, Plus, ArrowUp, ArrowDown } from "lucide-react";
 import { renderPageToCanvas } from "../../utils/class-notes-utils";
 import { motion } from "framer-motion";
 
@@ -31,7 +31,11 @@ const PageThumbnail = ({
     onDragStart,
     onDragEnd,
     onDragOver,
-    onDrop
+    onDrop,
+    onMoveUp,
+    onMoveDown,
+    canMoveUp,
+    canMoveDown
 }: {
     pdfRef: any,
     pageNum: number,
@@ -44,7 +48,11 @@ const PageThumbnail = ({
     onDragStart: (e: React.DragEvent) => void,
     onDragEnd: () => void,
     onDragOver: (e: React.DragEvent) => void,
-    onDrop: (e: React.DragEvent) => void
+    onDrop: (e: React.DragEvent) => void,
+    onMoveUp: () => void,
+    onMoveDown: () => void,
+    canMoveUp: boolean,
+    canMoveDown: boolean
 }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [loaded, setLoaded] = useState(false);
@@ -101,7 +109,7 @@ const PageThumbnail = ({
                 </div>
             </div>
 
-            {/* Action Buttons Column (Select + Edit) - Responsive sizes */}
+            {/* Action Buttons Column - Responsive */}
             <div className="absolute top-1 right-1 sm:top-2 sm:right-2 flex flex-col gap-1 sm:gap-2">
                 {/* Selection Indicator */}
                 {isSelected ? (
@@ -127,6 +135,32 @@ const PageThumbnail = ({
                     title="Edit Page"
                 >
                     <Pencil className="w-3 h-3 sm:w-4 sm:h-4 text-slate-300 hover:text-white" />
+                </button>
+            </div>
+
+            {/* Mobile Reorder Buttons - Left side, visible only on mobile */}
+            <div className="absolute top-1 left-1 flex flex-col gap-1 lg:hidden">
+                <button
+                    onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
+                    disabled={!canMoveUp}
+                    className={`p-1 rounded-lg transition-all ${canMoveUp
+                        ? 'bg-cyan-500/90 hover:bg-cyan-600 text-white'
+                        : 'bg-slate-800/50 text-slate-600 cursor-not-allowed'
+                        }`}
+                    title="Move Up"
+                >
+                    <ArrowUp className="w-3 h-3" />
+                </button>
+                <button
+                    onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
+                    disabled={!canMoveDown}
+                    className={`p-1 rounded-lg transition-all ${canMoveDown
+                        ? 'bg-cyan-500/90 hover:bg-cyan-600 text-white'
+                        : 'bg-slate-800/50 text-slate-600 cursor-not-allowed'
+                        }`}
+                    title="Move Down"
+                >
+                    <ArrowDown className="w-3 h-3" />
                 </button>
             </div>
 
@@ -169,6 +203,24 @@ export default function PageSelector({ files, totalPages, pageToFileMap, selecte
 
     const deselectAll = () => {
         onSelectionChange([]);
+    };
+
+    const movePageUp = (globalPageNum: number) => {
+        const currentIndex = pageOrder.indexOf(globalPageNum);
+        if (currentIndex > 0) {
+            const newOrder = [...pageOrder];
+            [newOrder[currentIndex - 1], newOrder[currentIndex]] = [newOrder[currentIndex], newOrder[currentIndex - 1]];
+            setPageOrder(newOrder);
+        }
+    };
+
+    const movePageDown = (globalPageNum: number) => {
+        const currentIndex = pageOrder.indexOf(globalPageNum);
+        if (currentIndex < pageOrder.length - 1) {
+            const newOrder = [...pageOrder];
+            [newOrder[currentIndex], newOrder[currentIndex + 1]] = [newOrder[currentIndex + 1], newOrder[currentIndex]];
+            setPageOrder(newOrder);
+        }
     };
 
     return (
@@ -237,6 +289,8 @@ export default function PageSelector({ files, totalPages, pageToFileMap, selecte
                         localPageNum -= files[j].pageCount;
                     }
 
+                    const currentIndex = pageOrder.indexOf(globalPageNum);
+
                     return (
                         <PageThumbnail
                             key={globalPageNum}
@@ -273,6 +327,10 @@ export default function PageSelector({ files, totalPages, pageToFileMap, selecte
                                 setPageOrder(newOrder);
                                 setDraggedPage(null);
                             }}
+                            onMoveUp={() => movePageUp(globalPageNum)}
+                            onMoveDown={() => movePageDown(globalPageNum)}
+                            canMoveUp={currentIndex > 0}
+                            canMoveDown={currentIndex < pageOrder.length - 1}
                         />
                     );
                 })}

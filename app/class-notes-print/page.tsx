@@ -67,6 +67,15 @@ export default function ClassNotesPrintPage() {
         stretchSlides: false,
     });
 
+    // Page Margins
+    const [marginPreset, setMarginPreset] = useState<'none' | 'slim' | 'big' | 'custom'>('none');
+    const [customMargins, setCustomMargins] = useState({
+        top: 10,
+        right: 10,
+        bottom: 10,
+        left: 10
+    });
+
     // Page Editing (Rotation)
     const [pageRotations, setPageRotations] = useState<Record<number, number>>({});
     const [pageCrops, setPageCrops] = useState<Record<number, CropRegion>>({});
@@ -92,10 +101,225 @@ export default function ClassNotesPrintPage() {
     // Preview
     const previewCanvasRef = useRef<HTMLCanvasElement>(null);
     const [previewPage, setPreviewPage] = useState<number>(1); // Which page to preview in the main editor
+    const [isExactPreview, setIsExactPreview] = useState(false); // Toggle for exact layout preview
+    const [previewPageGroup, setPreviewPageGroup] = useState(0); // Index of page group to preview
 
     useEffect(() => {
         initPdfJs();
     }, []);
+
+    // --- Helper Functions ---
+
+    // Calculate page groups based on layout configuration
+    const getPageGroups = () => {
+        const pagesPerGroup = layout.slidesPerRow * layout.slidesPerCol;
+        const groups = [];
+
+        for (let i = 0; i < selectedPages.length; i += pagesPerGroup) {
+            const groupPages = selectedPages.slice(i, i + pagesPerGroup);
+            groups.push({
+                start: groupPages[0],
+                end: groupPages[groupPages.length - 1],
+                pages: groupPages
+            });
+        }
+
+        return groups;
+    };
+
+    // Get page dimensions based on size and orientation (in points)
+    const getPageDimensions = (size: string, orientation: string) => {
+        const sizes: Record<string, { width: number; height: number }> = {
+            a4: { width: 595, height: 842 },
+            letter: { width: 612, height: 792 }
+        };
+
+        let dim = sizes[size] || sizes.a4;
+
+        if (orientation === 'landscape') {
+            return { width: dim.height, height: dim.width };
+        }
+
+        return dim;
+    };
+
+    // Get margin values based on preset
+    const getMargins = () => {
+        const presets = {
+            none: { top: 0, right: 0, bottom: 0, left: 0 },
+            slim: { top: 10, right: 10, bottom: 10, left: 10 },
+            big: { top: 30, right: 30, bottom: 30, left: 30 }
+        };
+
+        if (marginPreset === 'custom') {
+            return customMargins;
+        }
+
+        return presets[marginPreset];
+    };
+
+    // Render a single page into a cell for grid layout
+    const renderPageToCell = async (ctx: CanvasRenderingContext2D, pageNum: number, x: number, y: number, width: number, height: number) => {
+        // Get file and local page number from pageToFileMap
+        const fileIndex = pageToFileMap[pageNum];
+        if (fileIndex === undefined) return;
+
+        const fileData = files[fileIndex];
+        if (!fileData) return;
+
+        // Calculate local page number
+        let localPageNum = pageNum;
+        for (let j = 0; j < fileIndex; j++) {
+            localPageNum -= files[j].pageCount;
+        }
+
+        // Get margins and apply to cell
+        const margins = getMargins();
+        const cellX = x + margins.left;
+        const cellY = y + margins.top;
+        const cellWidth = width - margins.left - margins.right;
+        const cellHeight = height - margins.top - margins.bottom;
+
+        // Render page with rotation
+        const pageCanvas = await renderPageToCanvas(
+            fileData.pdfRef,
+            localPageNum,
+            2.0, // Higher quality for preview
+            pageRotations[pageNum] || 0
+        );
+
+        if (pageCanvas) {
+            if (layout.stretchSlides) {
+                // Stretch to fill cell (with margins)
+                ctx.drawImage(pageCanvas, cellX, cellY, cellWidth, cellHeight);
+            } else {
+                // Maintain aspect ratio (with margins)
+                const scale = Math.min(cellWidth / pageCanvas.width, cellHeight / pageCanvas.height);
+                const scaledWidth = pageCanvas.width * scale;
+                const scaledHeight = pageCanvas.height * scale;
+                const offsetX = cellX + (cellWidth - scaledWidth) / 2;
+                const offsetY = cellY + (cellHeight - scaledHeight) / 2;
+
+                ctx.drawImage(pageCanvas, offsetX, offsetY, scaledWidth, scaledHeight);
+            }
+        }
+    };
+
+    // Render exact preview with full layout
+    const renderExactPreview = async () => {
+        if (!previewCanvasRef.current || files.length === 0) return;
+
+        const canvas = previewCanvasRef.current;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const pageGroups = getPageGroups();
+        if (pageGroups.length === 0) return;
+
+        const currentGroup = pageGroups[previewPageGroup] || pageGroups[0];
+
+        // Calculate dimensions
+        const pageSize = getPageDimensions(layout.pageSize, layout.orientation);
+        const rows = layout.slidesPerRow;  // Number of rows
+        const cols = layout.slidesPerCol;  // Number of columns
+
+        // Set canvas size (scale up for better quality)
+        const scale = 1.5;
+        canvas.width = pageSize.width * scale;
+        canvas.height = pageSize.height * scale;
+        ctx.scale(scale, scale);
+
+        // Clear canvas with white background
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, pageSize.width, pageSize.height);
+
+        // Calculate cell dimensions
+        const cellWidth = pageSize.width / cols;
+        const cellHeight = pageSize.height / rows;
+
+        // Render each page in the group
+        for (let i = 0; i < currentGroup.pages.length; i++) {
+            const pageNum = currentGroup.pages[i];
+            const row = Math.floor(i / cols);
+            const col = i % cols;
+
+            const x = col * cellWidth;
+            const y = row * cellHeight;
+
+            // Render page into cell
+            await renderPageToCell(ctx, pageNum, x, y, cellWidth, cellHeight);
+        }
+
+        // Draw separation lines
+        if (layout.showSeparationLines) {
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1;
+
+            // Vertical lines
+            for (let i = 1; i < cols; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * cellWidth, 0);
+                ctx.lineTo(i * cellWidth, pageSize.height);
+                ctx.stroke();
+            }
+
+            // Horizontal lines
+            for (let i = 1; i < rows; i++) {
+                ctx.beginPath();
+                ctx.moveTo(0, i * cellHeight);
+                ctx.lineTo(pageSize.width, i * cellHeight);
+                ctx.stroke();
+            }
+        }
+    };
+
+    // Render single page preview
+    const renderSinglePagePreview = async () => {
+        if (!previewCanvasRef.current || files.length === 0) return;
+
+        const canvas = previewCanvasRef.current;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Get file for the preview page
+        const fileIndex = pageToFileMap[previewPage];
+        if (fileIndex === undefined) return;
+
+        const fileData = files[fileIndex];
+        if (!fileData) return;
+
+        // Calculate local page number
+        let localPageNum = previewPage;
+        for (let j = 0; j < fileIndex; j++) {
+            localPageNum -= files[j].pageCount;
+        }
+
+        // Render page
+        const pageCanvas = await renderPageToCanvas(
+            fileData.pdfRef,
+            localPageNum,
+            2.0,
+            pageRotations[previewPage] || 0
+        );
+
+        if (pageCanvas) {
+            canvas.width = pageCanvas.width;
+            canvas.height = pageCanvas.height;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(pageCanvas, 0, 0);
+        }
+    };
+
+    // useEffect to render preview when settings change
+    useEffect(() => {
+        if (step !== 2 || selectedPages.length === 0) return;
+
+        if (isExactPreview) {
+            renderExactPreview();
+        } else {
+            renderSinglePagePreview();
+        }
+    }, [step, isExactPreview, previewPageGroup, previewPage, layout, selectedPages, pageRotations, files]);
 
     // --- Handlers ---
 
@@ -370,14 +594,21 @@ export default function ClassNotesPrintPage() {
 
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
-            const margin = 10;
+
+            // Get margins from user selection
+            const margins = getMargins();
+            // Convert pixels to mm (rough approximation: 1px ≈ 0.264583mm)
+            const marginTop = margins.top * 0.264583;
+            const marginRight = margins.right * 0.264583;
+            const marginBottom = margins.bottom * 0.264583;
+            const marginLeft = margins.left * 0.264583;
 
             // Grid logic
             const numRows = layout.slidesPerRow;
             const numCols = layout.slidesPerCol;
 
-            const cellWidth = (pageWidth - (margin * 2)) / numCols;
-            const cellHeight = (pageHeight - (margin * 2)) / numRows;
+            const cellWidth = (pageWidth - marginLeft - marginRight) / numCols;
+            const cellHeight = (pageHeight - marginTop - marginBottom) / numRows;
 
             let currentSlot = 0;
             const slotsPerPage = numRows * numCols;
@@ -463,8 +694,8 @@ export default function ClassNotesPrintPage() {
                 const rowIndex = Math.floor(slotInPage / numCols);
                 const colIndex = slotInPage % numCols;
 
-                const x = margin + (colIndex * cellWidth);
-                const y = margin + (rowIndex * cellHeight);
+                const x = marginLeft + (colIndex * cellWidth);
+                const y = marginTop + (rowIndex * cellHeight);
 
                 // Fit Logic
                 const imgRatio = canvas.width / canvas.height;
@@ -564,16 +795,16 @@ export default function ClassNotesPrintPage() {
 
             {/* Step 2: Main Configuration */}
             {step === 2 && (
-                <div className="space-y-8">
+                <div className="space-y-4">
 
                     {/* Top Section: Controls */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
                         {/* Column 1: Enhancement & Logo */}
-                        <div className="space-y-6">
+                        <div className="space-y-3">
 
                             {/* Enhancement Panel */}
-                            <div className="bg-slate-900/50 rounded-2xl border border-white/5 p-6 space-y-6 h-full mt-6 lg:mt-8">
+                            <div className="bg-slate-900/50 rounded-2xl border border-white/5 p-4 space-y-4 h-full mt-4 lg:mt-6">
                                 <div>
                                     <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
                                         <Wand2 className="w-5 h-5 text-purple-400" /> Enhancement
@@ -826,14 +1057,14 @@ export default function ClassNotesPrintPage() {
                         </div>
 
                         {/* Column 2: Layout Controls */}
-                        <div className="space-y-6">
-                            <div className="bg-slate-900/50 rounded-2xl border border-white/5 p-6 space-y-6 h-full">
+                        <div className="space-y-3">
+                            <div className="bg-slate-900/50 rounded-2xl border border-white/5 p-4 space-y-4 h-full">
                                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                                     <Layout className="w-5 h-5 text-purple-400" /> Layout
                                 </h3>
 
                                 {/* Visual Layout Preview */}
-                                <div className="bg-slate-950/50 rounded-xl p-6 flex items-center justify-center gap-8 border border-white/5">
+                                <div className="bg-slate-950/50 rounded-xl p-4 flex items-center justify-center gap-6 border border-white/5">
                                     {/* Page Representation */}
                                     <div
                                         className="border-2 border-slate-700 bg-slate-900 shadow-xl relative transition-all duration-300 flex-shrink-0"
@@ -977,6 +1208,90 @@ export default function ClassNotesPrintPage() {
                                     </div>
                                 </div>
 
+                                {/* Page Margins */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-3">Page Margins</label>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        <button
+                                            className={`p-3 rounded-xl border text-xs font-medium flex items-center justify-center gap-1 transition ${marginPreset === 'none' ? 'bg-purple-500/20 border-purple-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
+                                            onClick={() => setMarginPreset('none')}
+                                        >
+                                            <Circle className={`w-3 h-3 ${marginPreset === 'none' ? 'fill-current' : ''}`} />
+                                            None
+                                        </button>
+                                        <button
+                                            className={`p-3 rounded-xl border text-xs font-medium flex items-center justify-center gap-1 transition ${marginPreset === 'slim' ? 'bg-purple-500/20 border-purple-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
+                                            onClick={() => setMarginPreset('slim')}
+                                        >
+                                            <Circle className={`w-3 h-3 ${marginPreset === 'slim' ? 'fill-current' : ''}`} />
+                                            Slim
+                                        </button>
+                                        <button
+                                            className={`p-3 rounded-xl border text-xs font-medium flex items-center justify-center gap-1 transition ${marginPreset === 'big' ? 'bg-purple-500/20 border-purple-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
+                                            onClick={() => setMarginPreset('big')}
+                                        >
+                                            <Circle className={`w-3 h-3 ${marginPreset === 'big' ? 'fill-current' : ''}`} />
+                                            Big
+                                        </button>
+                                        <button
+                                            className={`p-3 rounded-xl border text-xs font-medium flex items-center justify-center gap-1 transition ${marginPreset === 'custom' ? 'bg-purple-500/20 border-purple-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
+                                            onClick={() => setMarginPreset('custom')}
+                                        >
+                                            <Circle className={`w-3 h-3 ${marginPreset === 'custom' ? 'fill-current' : ''}`} />
+                                            Custom
+                                        </button>
+                                    </div>
+
+                                    {/* Custom Margin Inputs */}
+                                    {marginPreset === 'custom' && (
+                                        <div className="mt-3 grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="block text-[10px] text-slate-500 mb-1">Top (px)</label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="100"
+                                                    value={customMargins.top}
+                                                    onChange={(e) => setCustomMargins({ ...customMargins, top: Number(e.target.value) })}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] text-slate-500 mb-1">Right (px)</label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="100"
+                                                    value={customMargins.right}
+                                                    onChange={(e) => setCustomMargins({ ...customMargins, right: Number(e.target.value) })}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] text-slate-500 mb-1">Bottom (px)</label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="100"
+                                                    value={customMargins.bottom}
+                                                    onChange={(e) => setCustomMargins({ ...customMargins, bottom: Number(e.target.value) })}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] text-slate-500 mb-1">Left (px)</label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="100"
+                                                    value={customMargins.left}
+                                                    onChange={(e) => setCustomMargins({ ...customMargins, left: Number(e.target.value) })}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -984,24 +1299,55 @@ export default function ClassNotesPrintPage() {
 
 
                     {/* Bottom Section: Preview & Actions - Full Width */}
-                    <div className="space-y-6 border-t border-white/10 pt-8">
+                    <div className="space-y-3 border-t border-white/10 pt-4">
 
-                        <div className="bg-slate-900/50 rounded-2xl border border-white/5 p-6 min-h-[500px] flex flex-col">
-                            <div className="flex items-center justify-between mb-4">
+                        <div className="bg-slate-900/50 rounded-2xl border border-white/5 p-4 min-h-[500px] flex flex-col">
+                            <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                                 <h3 className="font-bold text-white flex items-center gap-2">
                                     <Eye className="w-5 h-5 text-purple-400" /> Layout Preview
                                 </h3>
-                                <div className="flex items-center gap-3">
-                                    <span className="text-sm text-slate-400">Previewing Page:</span>
-                                    <select
-                                        value={previewPage}
-                                        onChange={(e) => setPreviewPage(Number(e.target.value))}
-                                        className="bg-slate-950 text-sm border border-slate-700 text-white rounded-lg px-3 py-1.5 focus:border-purple-500 outline-none"
-                                    >
-                                        {selectedPages.map(p => (
-                                            <option key={p} value={p}>Page {p}</option>
-                                        ))}
-                                    </select>
+                                <div className="flex items-center gap-4 flex-wrap">
+                                    {/* Exact Preview Toggle */}
+                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                        <input
+                                            type="checkbox"
+                                            checked={isExactPreview}
+                                            onChange={(e) => {
+                                                setIsExactPreview(e.target.checked);
+                                                setPreviewPageGroup(0); // Reset to first group
+                                            }}
+                                            className="w-4 h-4 rounded border-slate-700 text-purple-500 focus:ring-purple-500 focus:ring-offset-slate-900 cursor-pointer"
+                                        />
+                                        <span className="text-sm text-slate-300 group-hover:text-white transition">Exact Preview</span>
+                                    </label>
+
+                                    {/* Page/Group Dropdown */}
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm text-slate-400">Previewing:</span>
+                                        {isExactPreview ? (
+                                            <select
+                                                value={previewPageGroup}
+                                                onChange={(e) => setPreviewPageGroup(Number(e.target.value))}
+                                                className="bg-slate-950 text-sm border border-slate-700 text-white rounded-lg px-3 py-1.5 focus:border-purple-500 outline-none"
+                                            >
+                                                {getPageGroups().map((group, idx) => (
+                                                    <option key={idx} value={idx}>
+                                                        Page {group.start}{group.end !== group.start ? `-${group.end}` : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <select
+                                                value={previewPage}
+                                                onChange={(e) => setPreviewPage(Number(e.target.value))}
+                                                className="bg-slate-950 text-sm border border-slate-700 text-white rounded-lg px-3 py-1.5 focus:border-purple-500 outline-none"
+                                            >
+                                                {selectedPages.map(p => (
+                                                    <option key={p} value={p}>Page {p}</option>
+                                                ))}
+                                            </select>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
@@ -1052,12 +1398,12 @@ export default function ClassNotesPrintPage() {
                     originalSize={formatBytes(originalFileSize || 0)}
                     finalSize={successData?.formattedSize || "0 MB"}
                     pageCount={successData?.pageCount || 0}
-                    onDownload={() => {
+                    onDownload={(customFileName) => {
                         if (successData?.blob) {
                             const url = URL.createObjectURL(successData.blob);
                             const a = document.createElement('a');
                             a.href = url;
-                            a.download = files.length > 0 ? files[0].file.name.replace(/\.(pdf|jpe?g|png|webp)$/i, '_class_notes.pdf') : "class-notes.pdf";
+                            a.download = customFileName || (files.length > 0 ? files[0].file.name.replace(/\.(pdf|jpe?g|png|webp)$/i, '_class_notes.pdf') : "class-notes.pdf");
                             document.body.appendChild(a);
                             a.click();
                             document.body.removeChild(a);
@@ -1082,7 +1428,7 @@ export default function ClassNotesPrintPage() {
                             pageSize: 'a4',
                             orientation: 'portrait',
                             slidesPerRow: 1, // Reset to default 1
-                            slidesPerCol: 3, // Reset to default 3
+                            slidesPerCol: 1, // Reset to default 3
                             showSeparationLines: true,
                             stretchSlides: false
                         });

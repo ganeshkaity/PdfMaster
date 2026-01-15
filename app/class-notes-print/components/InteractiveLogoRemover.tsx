@@ -208,7 +208,7 @@ export default function InteractiveLogoRemover({ pdf, isOpen, onClose, onApply, 
 
                 {/* Canvas Area */}
                 <div className="flex-1 overflow-auto p-8 bg-slate-950 flex items-center justify-center cursor-crosshair">
-                    <div className="relative shadow-2xl">
+                    <div className="relative shadow-2xl mt-20">
                         <canvas ref={canvasRef} className="block max-w-full" style={{ maxHeight: '55vh' }} />
                         <canvas
                             ref={overlayRef}
