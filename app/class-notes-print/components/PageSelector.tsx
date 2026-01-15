@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Check, CheckCircle2, Circle } from "lucide-react";
+import { Check, CheckCircle2, Circle, Pencil, RotateCw } from "lucide-react";
 import { renderPageToCanvas } from "../../utils/class-notes-utils";
 import { motion } from "framer-motion";
 
@@ -11,9 +11,11 @@ interface PageSelectorProps {
     onSelectionChange: (pages: number[]) => void;
     onNext: () => void;
     onBack: () => void;
+    onEdit: (pageNum: number) => void;
+    pageRotations?: Record<number, number>;
 }
 
-const PageThumbnail = ({ pdf, pageNum, isSelected, onClick }: { pdf: any, pageNum: number, isSelected: boolean, onClick: () => void }) => {
+const PageThumbnail = ({ pdf, pageNum, isSelected, rotation, onClick, onEdit }: { pdf: any, pageNum: number, isSelected: boolean, rotation?: number, onClick: () => void, onEdit: (p: number) => void }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [loaded, setLoaded] = useState(false);
 
@@ -22,7 +24,7 @@ const PageThumbnail = ({ pdf, pageNum, isSelected, onClick }: { pdf: any, pageNu
         const render = async () => {
             if (!pdf || loaded) return;
             // Render small thumbnail
-            const canvas = await renderPageToCanvas(pdf, pageNum, 0.3);
+            const canvas = await renderPageToCanvas(pdf, pageNum, 0.3, rotation || 0);
             if (active && canvas && canvasRef.current) {
                 const ctx = canvasRef.current.getContext('2d');
                 if (ctx) {
@@ -35,7 +37,7 @@ const PageThumbnail = ({ pdf, pageNum, isSelected, onClick }: { pdf: any, pageNu
         };
         render();
         return () => { active = false; };
-    }, [pdf, pageNum]);
+    }, [pdf, pageNum, rotation]);
 
     return (
         <div
@@ -50,7 +52,18 @@ const PageThumbnail = ({ pdf, pageNum, isSelected, onClick }: { pdf: any, pageNu
                 <div className={`absolute inset-0 transition-opacity bg-cyan-500/10 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
             </div>
 
-            <div className="absolute top-2 right-2">
+            <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit(pageNum);
+                    }}
+                    className="bg-slate-900/80 text-slate-300 hover:text-white rounded-full p-1.5 border border-white/10 hover:border-cyan-500/50 hover:bg-cyan-500/20 transition backdrop-blur-sm"
+                    title="Edit Page"
+                >
+                    <Pencil className="w-3 h-3" />
+                </button>
+
                 {isSelected ? (
                     <div className="bg-cyan-500 text-white rounded-full p-1 shadow-lg">
                         <Check className="w-3 h-3" />
@@ -69,7 +82,7 @@ const PageThumbnail = ({ pdf, pageNum, isSelected, onClick }: { pdf: any, pageNu
     );
 };
 
-export default function PageSelector({ pdf, selectedPages, onSelectionChange, onNext, onBack }: PageSelectorProps) {
+export default function PageSelector({ pdf, selectedPages, onSelectionChange, onNext, onBack, onEdit, pageRotations }: PageSelectorProps) {
 
     const togglePage = (pageNum: number) => {
         if (selectedPages.includes(pageNum)) {
@@ -125,6 +138,8 @@ export default function PageSelector({ pdf, selectedPages, onSelectionChange, on
                         pageNum={pageNum}
                         isSelected={selectedPages.includes(pageNum)}
                         onClick={() => togglePage(pageNum)}
+                        onEdit={onEdit}
+                        rotation={pageRotations?.[pageNum] || 0}
                     />
                 ))}
             </div>

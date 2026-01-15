@@ -15,6 +15,7 @@ import InteractiveLogoRemover from "./components/InteractiveLogoRemover";
 import StepsIndicator from "./components/StepsIndicator";
 import ProcessingView from "./components/ProcessingView";
 import SuccessView from "./components/SuccessView";
+import PageEditModal, { CropRegion } from "./components/PageEditModal";
 
 export default function ClassNotesPrintPage() {
     // Pipeline Steps: 0 = Upload, 1 = Select Pages, 2 = Configure/Preview
@@ -48,6 +49,7 @@ export default function ClassNotesPrintPage() {
         removeBackground: false, // "Clear PDF Background"
         brightness: 100,
         contrast: 100,
+        saturation: 100,
     });
     // Extra filter for "Black & White" (Pure thresholding, distinct from Grayscale)
     const [isBlackAndWhite, setIsBlackAndWhite] = useState(false);
@@ -62,6 +64,11 @@ export default function ClassNotesPrintPage() {
         stretchSlides: false,
     });
 
+    // Page Editing (Rotation)
+    const [pageRotations, setPageRotations] = useState<Record<number, number>>({});
+    const [pageCrops, setPageCrops] = useState<Record<number, CropRegion>>({});
+    const [editingPage, setEditingPage] = useState<number | null>(null);
+
     // Logo Removal
     const [showLogoModal, setShowLogoModal] = useState(false);
     const [logoRegion, setLogoRegion] = useState<LogoRegion | undefined>(undefined);
@@ -71,6 +78,13 @@ export default function ClassNotesPrintPage() {
     const [logoFillType, setLogoFillType] = useState<'white' | 'black' | 'custom' | 'blur'>('white');
     const [logoFillColor, setLogoFillColor] = useState('#ffffff');
     const [logoBlurStrength, setLogoBlurStrength] = useState(5);
+
+    // Output Quality
+    const [quality, setQuality] = useState<'low' | 'medium' | 'high' | 'ultra' | 'original'>('high');
+
+    // Color Filters
+    // Color Filters
+    const [colorFilter, setColorFilter] = useState<'original' | 'auto-color' | 'light-text' | 'hd' | 'custom'>('original');
 
     // Preview
     const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -111,12 +125,79 @@ export default function ClassNotesPrintPage() {
         setStep(2); // Move to Configure
     };
 
+    const handlePageEdit = (pageNum: number) => {
+        setEditingPage(pageNum);
+    };
+
+    const handleEditApply = (rotation: number, crop?: CropRegion) => {
+        if (editingPage === null) return;
+        setPageRotations(prev => ({ ...prev, [editingPage]: rotation }));
+        if (crop) {
+            setPageCrops(prev => ({ ...prev, [editingPage]: crop }));
+        } else {
+            // Remove crop if user reset it
+            const newCrops = { ...pageCrops };
+            delete newCrops[editingPage];
+            setPageCrops(newCrops);
+        }
+        setEditingPage(null);
+    };
+
+    const onProcessAnother = () => {
+        setStep(0);
+        setFile(null);
+        setPdfRef(null);
+        setNumPages(0);
+        setSelectedPages([]);
+        setOriginalFileSize(0);
+        setProgressState({
+            percent: 0,
+            current: 0,
+            total: 0,
+            estimatedTime: "~ calculating"
+        });
+        setSuccessData(null);
+        setFilters({
+            invert: false,
+            grayscale: false,
+            removeBackground: false,
+            brightness: 100,
+            contrast: 100,
+            saturation: 100, // Reset saturation
+        });
+        setIsBlackAndWhite(false);
+        setLayout({
+            slidesPerRow: 1,
+            slidesPerCol: 1,
+            orientation: "portrait",
+            pageSize: "a4",
+            showSeparationLines: false,
+            stretchSlides: false,
+        });
+        setShowLogoModal(false);
+        setLogoRegion(undefined);
+        setIsLogoRemovalEnabled(false);
+        setLogoFillType('white');
+        setLogoFillColor('#ffffff');
+        setLogoBlurStrength(5);
+        setQuality('high');
+        setColorFilter('original');
+        setPreviewPage(1);
+        setPageRotations({});
+        setPageCrops({});
+        setEditingPage(null);
+    };
+
+
+
     // --- Preview Logic ---
     const renderLivePreview = async () => {
         if (!pdfRef || !previewCanvasRef.current) return;
 
         // Render base page
-        const canvas = await renderPageToCanvas(pdfRef, previewPage, 0.8);
+        const rotation = pageRotations[previewPage] || 0;
+        const crop = pageCrops[previewPage];
+        const canvas = await renderPageToCanvas(pdfRef, previewPage, 0.8, rotation, crop);
         if (!canvas || !previewCanvasRef.current) return;
 
         const ctx = previewCanvasRef.current.getContext('2d');
@@ -128,6 +209,16 @@ export default function ClassNotesPrintPage() {
 
         // Apply filters
         const activeFilters = { ...filters };
+
+        // Apply Color Filter Presets
+        switch (colorFilter) {
+            case 'auto-color': activeFilters.contrast = 115; activeFilters.brightness = 110; activeFilters.saturation = 100; break;
+            case 'light-text': activeFilters.contrast = 130; activeFilters.brightness = 125; activeFilters.saturation = 90; break;
+            case 'hd': activeFilters.contrast = 120; activeFilters.brightness = 105; activeFilters.saturation = 110; break;
+            case 'custom': /* Use sliders */ break;
+            case 'original': default: activeFilters.contrast = 100; activeFilters.brightness = 100; activeFilters.saturation = 100; break;
+        }
+
         if (isBlackAndWhite) {
             activeFilters.grayscale = true;
             activeFilters.contrast = 150;
@@ -148,7 +239,7 @@ export default function ClassNotesPrintPage() {
         if (step === 2) {
             renderLivePreview();
         }
-    }, [step, filters, isBlackAndWhite, logoRegion, isLogoRemovalEnabled, previewPage, logoFillType, logoFillColor, logoBlurStrength]);
+    }, [step, filters, isBlackAndWhite, logoRegion, isLogoRemovalEnabled, previewPage, logoFillType, logoFillColor, logoBlurStrength, colorFilter]);
 
 
     // --- Output Generation ---
@@ -189,6 +280,16 @@ export default function ClassNotesPrintPage() {
             let currentSlot = 0;
             const slotsPerPage = numRows * numCols;
             const activeFilters = { ...filters };
+
+            // Apply Color Filter Presets
+            switch (colorFilter) {
+                case 'auto-color': activeFilters.contrast = 115; activeFilters.brightness = 110; activeFilters.saturation = 100; break;
+                case 'light-text': activeFilters.contrast = 130; activeFilters.brightness = 125; activeFilters.saturation = 90; break;
+                case 'hd': activeFilters.contrast = 120; activeFilters.brightness = 105; activeFilters.saturation = 110; break;
+                case 'custom': /* Use sliders */ break;
+                case 'original': default: activeFilters.contrast = 100; activeFilters.brightness = 100; activeFilters.saturation = 100; break;
+            }
+
             if (isBlackAndWhite) {
                 activeFilters.grayscale = true;
                 activeFilters.contrast = 150;
@@ -213,7 +314,19 @@ export default function ClassNotesPrintPage() {
                 // Yield to main thread to allow UI update
                 await new Promise(resolve => setTimeout(resolve, 0));
 
-                const canvas = await renderPageToCanvas(pdfRef, pageNum, 2.0);
+                const getScale = () => {
+                    switch (quality) {
+                        case 'low': return 1.0;
+                        case 'medium': return 1.5;
+                        case 'high': return 2.0;
+                        case 'ultra': return 3.0;
+                        case 'original': return 1.5; // Default assumption for original if specific vector scale not applicable, or match 'medium'.
+                        default: return 2.0;
+                    }
+                };
+                const rotation = pageRotations[pageNum] || 0;
+                const crop = pageCrops[pageNum];
+                const canvas = await renderPageToCanvas(pdfRef, pageNum, getScale(), rotation, crop);
                 if (!canvas) continue;
 
                 // Apply logic
@@ -320,6 +433,8 @@ export default function ClassNotesPrintPage() {
                     onSelectionChange={setSelectedPages}
                     onNext={handlePageSelectionNext}
                     onBack={() => setStep(0)}
+                    onEdit={handlePageEdit}
+                    pageRotations={pageRotations}
                 />
             )}
 
@@ -480,6 +595,108 @@ export default function ClassNotesPrintPage() {
                                         )}
                                     </div>
                                 </div>
+
+                                <div className="h-px bg-white/10" />
+
+                                {/* Output Quality */}
+                                <div>
+                                    <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
+                                        <Settings2 className="w-5 h-5 text-purple-400" /> Output Quality
+                                    </h3>
+                                    <div className="bg-slate-950/50 rounded-xl border border-white/5 p-4">
+                                        <div className="grid grid-cols-5 gap-1 bg-slate-900 rounded-lg p-1 border border-slate-800">
+                                            {(['low', 'medium', 'high', 'ultra', 'original'] as const).map((q) => (
+                                                <button
+                                                    key={q}
+                                                    onClick={() => setQuality(q)}
+                                                    className={`py-1.5 text-[10px] sm:text-xs font-medium rounded-md transition capitalize ${quality === q ? 'bg-purple-500 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                                                >
+                                                    {q}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <p className="text-xs text-slate-500 mt-2 text-center">
+                                            {quality === 'low' && 'Fastest, lower resolution (1.0x)'}
+                                            {quality === 'medium' && 'Balanced speed & quality (1.5x)'}
+                                            {quality === 'high' && 'Recommended for printing (2.0x)'}
+                                            {quality === 'ultra' && 'Maximum detail, slower processing (3.0x)'}
+                                            {quality === 'original' && 'Standard rendering (1.5x)'}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="h-px bg-white/10" />
+
+                                {/* Color Filters */}
+                                <div>
+                                    <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
+                                        <Wand2 className="w-5 h-5 text-purple-400" /> Color Filters
+                                    </h3>
+                                    <div className="bg-slate-950/50 rounded-xl border border-white/5 p-4">
+                                        <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-800 overflow-x-auto custom-scrollbar">
+                                            {(['original', 'auto-color', 'light-text', 'hd', 'custom'] as const).map((f) => (
+                                                <button
+                                                    key={f}
+                                                    onClick={() => setColorFilter(f)}
+                                                    className={`flex-1 min-w-[70px] py-2 px-1 text-[10px] sm:text-xs font-medium rounded-md transition capitalize whitespace-nowrap ${colorFilter === f ? 'bg-purple-500 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                                                >
+                                                    {f.replace('-', ' ')}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Custom Sliders */}
+                                        {colorFilter === 'custom' && (
+                                            <div className="mt-4 space-y-3 pt-3 border-t border-white/5">
+                                                {/* Saturation */}
+                                                <div>
+                                                    <div className="flex justify-between text-xs mb-1">
+                                                        <span className="text-slate-400">Saturation</span>
+                                                        <span className="text-purple-400 font-mono">{filters.saturation}%</span>
+                                                    </div>
+                                                    <input
+                                                        type="range"
+                                                        min="0"
+                                                        max="200"
+                                                        value={filters.saturation}
+                                                        onChange={(e) => setFilters(prev => ({ ...prev, saturation: Number(e.target.value) }))}
+                                                        className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                                                    />
+                                                </div>
+                                                {/* Contrast */}
+                                                <div>
+                                                    <div className="flex justify-between text-xs mb-1">
+                                                        <span className="text-slate-400">Contrast</span>
+                                                        <span className="text-purple-400 font-mono">{filters.contrast}%</span>
+                                                    </div>
+                                                    <input
+                                                        type="range"
+                                                        min="0"
+                                                        max="200"
+                                                        value={filters.contrast}
+                                                        onChange={(e) => setFilters(prev => ({ ...prev, contrast: Number(e.target.value) }))}
+                                                        className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                                                    />
+                                                </div>
+                                                {/* Brightness */}
+                                                <div>
+                                                    <div className="flex justify-between text-xs mb-1">
+                                                        <span className="text-slate-400">Brightness</span>
+                                                        <span className="text-purple-400 font-mono">{filters.brightness}%</span>
+                                                    </div>
+                                                    <input
+                                                        type="range"
+                                                        min="0"
+                                                        max="200"
+                                                        value={filters.brightness}
+                                                        onChange={(e) => setFilters(prev => ({ ...prev, brightness: Number(e.target.value) }))}
+                                                        className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
 
                         </div>
@@ -615,6 +832,27 @@ export default function ClassNotesPrintPage() {
                                     </div>
                                 </div>
 
+                                {/* Stretch Slides */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-3">Stretch Slides</label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button
+                                            className={`p-3 rounded-xl border text-sm font-medium flex items-center gap-2 transition ${!layout.stretchSlides ? 'bg-purple-500/20 border-purple-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
+                                            onClick={() => setLayout({ ...layout, stretchSlides: false })}
+                                        >
+                                            <Circle className={`w-4 h-4 ${!layout.stretchSlides ? 'fill-current' : ''}`} />
+                                            No
+                                        </button>
+                                        <button
+                                            className={`p-3 rounded-xl border text-sm font-medium flex items-center gap-2 transition ${layout.stretchSlides ? 'bg-purple-500/20 border-purple-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
+                                            onClick={() => setLayout({ ...layout, stretchSlides: true })}
+                                        >
+                                            <Circle className={`w-4 h-4 ${layout.stretchSlides ? 'fill-current' : ''}`} />
+                                            Yes
+                                        </button>
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
 
@@ -727,10 +965,15 @@ export default function ClassNotesPrintPage() {
                         setProgressState({ percent: 0, total: 0, current: 0, estimatedTime: 'N/A' });
                         setSuccessData(null);
                         setOriginalFileSize(0);
+                        setQuality('high');
+                        setColorFilter('original');
+                        setPageRotations({}); // Reset page rotations
+                        setPageCrops({}); // Reset page crops
                     }}
                 />
             )}
 
+            {/* Logo Removal Modal */}
             <InteractiveLogoRemover
                 pdf={pdfRef}
                 isOpen={showLogoModal}
@@ -741,6 +984,20 @@ export default function ClassNotesPrintPage() {
                     setShowLogoModal(false);
                 }}
             />
+
+            {/* Page Edit Modal */}
+            {editingPage !== null && (
+                <PageEditModal
+                    pdf={pdfRef}
+                    pageNumber={editingPage}
+                    initialRotation={pageRotations[editingPage] || 0}
+                    initialCrop={pageCrops[editingPage]}
+                    isOpen={true}
+                    onClose={() => setEditingPage(null)}
+                    onApply={handleEditApply}
+                />
+            )}
+
         </ToolLayout>
     );
 }
