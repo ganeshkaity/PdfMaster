@@ -48,6 +48,9 @@ const PageThumbnail = ({
 }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [loaded, setLoaded] = useState(false);
+    const touchStartPos = useRef<{ x: number; y: number } | null>(null);
+    const [isTouchDragging, setIsTouchDragging] = useState(false);
+    const touchDragThreshold = 10; // Pixels to move before considering it a drag
 
     useEffect(() => {
         let active = true;
@@ -89,36 +92,43 @@ const PageThumbnail = ({
                 <div className={`absolute inset-0 transition-opacity bg-cyan-500/10 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
             </div>
 
-            {/* Selection Indicator */}
-            <div className="absolute top-2 right-2 flex items-center gap-1.5">
-                {isSelected ? (
-                    <div className="bg-cyan-500 text-white rounded-full p-1 shadow-lg" onClick={onClick}>
-                        <Check className="w-3 h-3" />
-                    </div>
-                ) : (
-                    <div className="bg-slate-900/80 text-slate-400 rounded-full p-1 border border-white/10 group-hover:border-white/50" onClick={onClick}>
-                        <div className="w-3 h-3" />
-                    </div>
-                )}
-            </div>
-
-            {/* Drag Indicator */}
-            <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* Drag Indicator - Hidden on small screens */}
+            <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity hidden sm:block">
                 <div className="bg-slate-950/80 rounded p-1 text-slate-400">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M10 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 8.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM11.5 15.5a1.5 1.5 0 10-3 0 1.5 1.5 0 003 0z"></path>
                     </svg>
                 </div>
             </div>
 
-            {/* Edit Button */}
-            <button
-                onClick={(e) => { e.stopPropagation(); onEdit(globalPageNum); }}
-                className="absolute top-2 right-10 bg-slate-950/80 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-purple-500 hover:scale-110 z-10"
-                title="Edit Page"
-            >
-                <Pencil className="w-3 h-3 text-slate-300" />
-            </button>
+            {/* Action Buttons Column (Select + Edit) - Responsive sizes */}
+            <div className="absolute top-1 right-1 sm:top-2 sm:right-2 flex flex-col gap-1 sm:gap-2">
+                {/* Selection Indicator */}
+                {isSelected ? (
+                    <div
+                        className="bg-cyan-500 text-white rounded-full p-1 sm:p-2 shadow-lg cursor-pointer hover:bg-cyan-600 transition"
+                        onClick={onClick}
+                    >
+                        <Check className="w-3 h-3 sm:w-4 sm:h-4" />
+                    </div>
+                ) : (
+                    <div
+                        className="bg-slate-900/80 text-slate-400 rounded-full p-1 sm:p-2 border border-white/10 group-hover:border-white/50 cursor-pointer hover:bg-slate-800 transition"
+                        onClick={onClick}
+                    >
+                        <div className="w-3 h-3 sm:w-4 sm:h-4" />
+                    </div>
+                )}
+
+                {/* Edit Button - Always visible */}
+                <button
+                    onClick={(e) => { e.stopPropagation(); onEdit(globalPageNum); }}
+                    className="bg-slate-950/80 p-1 sm:p-2 rounded-lg transition-all hover:bg-purple-500 hover:scale-110"
+                    title="Edit Page"
+                >
+                    <Pencil className="w-3 h-3 sm:w-4 sm:h-4 text-slate-300 hover:text-white" />
+                </button>
+            </div>
 
             <div className="absolute bottom-0 w-full bg-slate-950/80 backdrop-blur-sm py-1 text-center border-t border-white/5">
                 <span className={`text-xs font-mono ${isSelected ? 'text-cyan-400' : 'text-slate-400'}`}>Page {globalPageNum}</span>
@@ -165,19 +175,19 @@ export default function PageSelector({ files, totalPages, pageToFileMap, selecte
         <div className="space-y-6">
 
             {/* Header Controls */}
-            <div className="flex items-center justify-between bg-slate-800/50 p-4 rounded-2xl border border-white/5 sticky top-0 z-10 backdrop-blur-xl">
-                <div className="flex items-center gap-4">
-                    <h3 className="text-lg font-bold text-white">Select Pages</h3>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 bg-slate-800/50 p-4 rounded-2xl border border-white/5 sticky top-0 z-10 backdrop-blur-xl">
+                <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                    <h3 className="text-base sm:text-lg font-bold text-white">Select Pages</h3>
                     <div className="h-6 w-px bg-white/10" />
-                    <span className="text-slate-400 text-sm">{selectedPages.length} of {totalPages} selected</span>
+                    <span className="text-slate-400 text-xs sm:text-sm">{selectedPages.length} of {totalPages} selected</span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                     {onAddMore && (
                         <>
                             <button
                                 onClick={() => fileInputRef.current?.click()}
-                                className="px-3 py-1.5 text-xs font-medium text-purple-400 bg-purple-500/10 rounded-lg hover:bg-purple-500/20 transition flex items-center gap-1"
+                                className="px-3 py-1.5 text-xs font-medium text-purple-400 bg-purple-500/10 rounded-lg hover:bg-purple-500/20 transition flex items-center justify-center gap-1"
                             >
                                 <Plus className="w-3.5 h-3.5" /> Add More Files
                             </button>
@@ -195,7 +205,7 @@ export default function PageSelector({ files, totalPages, pageToFileMap, selecte
                                     e.target.value = ''; // Reset input
                                 }}
                             />
-                            <div className="h-6 w-px bg-white/10" />
+                            <div className="hidden sm:block h-6 w-px bg-white/10" />
                         </>
                     )}
                     <button

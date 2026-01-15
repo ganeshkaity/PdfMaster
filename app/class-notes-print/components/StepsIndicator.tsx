@@ -35,8 +35,8 @@ export default function StepsIndicator({ currentStep, steps }: StepsIndicatorPro
                                     borderColor: isCompleted || isActive ? '#a855f7' : '#334155', // slate-700
                                 }}
                                 className={`w-10 h-10 rounded-full flex items-center justify-center border-4 transition-colors duration-300 z-10 ${isCompleted || isActive
-                                        ? 'shadow-[0_0_15px_rgba(168,85,247,0.5)]'
-                                        : 'bg-slate-900 border-slate-700 shadow-xl'
+                                    ? 'shadow-[0_0_15px_rgba(168,85,247,0.5)]'
+                                    : 'bg-slate-900 border-slate-700 shadow-xl'
                                     }`}
                             >
                                 {isCompleted ? (
@@ -50,6 +50,7 @@ export default function StepsIndicator({ currentStep, steps }: StepsIndicatorPro
 
                             {/* Label */}
                             <span className={`absolute top-full mt-2 text-xs font-medium whitespace-nowrap transition-colors duration-300 ${isActive ? 'text-white' : isCompleted ? 'text-slate-300' : 'text-slate-600'
+                                } ${isActive ? 'block' : 'hidden sm:block'
                                 }`}>
                                 {label}
                             </span>

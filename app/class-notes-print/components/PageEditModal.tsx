@@ -39,6 +39,28 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
         }
     }, [isOpen, initialRotation, initialCrop, pageNumber]);
 
+    // Lock body scroll when modal is open
+    useEffect(() => {
+        if (isOpen) {
+            // Save current scroll position
+            const scrollY = window.scrollY;
+            document.body.style.position = 'fixed';
+            document.body.style.top = `-${scrollY}px`;
+            document.body.style.width = '100%';
+            document.body.style.overflow = 'hidden';
+
+            // Cleanup function
+            return () => {
+                const scrollY = document.body.style.top;
+                document.body.style.position = '';
+                document.body.style.top = '';
+                document.body.style.width = '';
+                document.body.style.overflow = '';
+                window.scrollTo(0, parseInt(scrollY || '0', 10) * -1);
+            };
+        }
+    }, [isOpen]);
+
     // Redraw when Rotation or Page changes
     useEffect(() => {
         if (!isOpen || !pdf) return;
@@ -343,13 +365,14 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
                     </div>
                 </div>
 
-                {/* Main Content */}
-                <div className="flex-1 overflow-hidden flex flex-col">
 
-                    {/* Preview & Crop */}
-                    <div className="flex-1 relative bg-slate-950/50 flex items-center justify-center p-3 sm:p-6 overflow-auto min-h-[300px]">
-                        <div className="relative shadow-2xl">
-                            <canvas ref={canvasRef} className="max-w-full max-h-[40vh] sm:max-h-[50vh] object-contain block" />
+                {/* Main Content */}
+                <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
+
+                    {/* Preview & Crop - 65% on desktop */}
+                    <div className="flex-1 lg:w-[65%] relative bg-slate-950/50 flex items-center justify-center p-3 sm:p-6 overflow-auto min-h-[300px] lg:min-h-0">
+                        <div className="relative shadow-2xl lg:mt-32">
+                            <canvas ref={canvasRef} className="max-w-full max-h-[40vh] sm:max-h-[50vh] lg:max-h-[75vh] object-contain block" />
                             <canvas
                                 ref={overlayRef}
                                 className="absolute inset-0 w-full h-full cursor-crosshair touch-none"
@@ -361,8 +384,8 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
                         </div>
                     </div>
 
-                    {/* Controls */}
-                    <div className="w-full border-t border-white/10 bg-slate-900 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 max-h-[40vh] sm:max-h-none">
+                    {/* Controls - 35% on desktop */}
+                    <div className="w-full lg:w-[35%] border-t lg:border-l lg:border-t-0 border-white/10 bg-slate-900 overflow-y-auto p-4 sm:p-6 lg:pt-8 space-y-4 sm:space-y-6 max-h-[40vh] lg:max-h-none">
 
                         {/* Presets */}
                         <div className="space-y-4">

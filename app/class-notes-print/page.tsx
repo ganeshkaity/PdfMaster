@@ -573,7 +573,7 @@ export default function ClassNotesPrintPage() {
                         <div className="space-y-6">
 
                             {/* Enhancement Panel */}
-                            <div className="bg-slate-900/50 rounded-2xl border border-white/5 p-6 space-y-6 h-full">
+                            <div className="bg-slate-900/50 rounded-2xl border border-white/5 p-6 space-y-6 h-full mt-6 lg:mt-8">
                                 <div>
                                     <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
                                         <Wand2 className="w-5 h-5 text-purple-400" /> Enhancement
