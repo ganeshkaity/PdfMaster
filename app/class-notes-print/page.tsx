@@ -49,6 +49,11 @@ export default function ClassNotesPrintPage() {
     const [logoRegion, setLogoRegion] = useState<LogoRegion | undefined>(undefined);
     const [isLogoRemovalEnabled, setIsLogoRemovalEnabled] = useState(false);
 
+    // Advanced Logo Removal Options
+    const [logoFillType, setLogoFillType] = useState<'white' | 'black' | 'custom' | 'blur'>('white');
+    const [logoFillColor, setLogoFillColor] = useState('#ffffff');
+    const [logoBlurStrength, setLogoBlurStrength] = useState(5);
+
     // Preview
     const previewCanvasRef = useRef<HTMLCanvasElement>(null);
     const [previewPage, setPreviewPage] = useState<number>(1); // Which page to preview in the main editor
@@ -103,23 +108,28 @@ export default function ClassNotesPrintPage() {
         ctx.drawImage(canvas, 0, 0);
 
         // Apply filters
-        // If Black & White is Checked, we might override grayscale or handle it in applyFilters
-        // For now let's pass it as a special case or part of filters
         const activeFilters = { ...filters };
         if (isBlackAndWhite) {
-            // Simple hack: High contrast + grayscale = B&W-ish
             activeFilters.grayscale = true;
             activeFilters.contrast = 150;
         }
 
-        applyFiltersToCanvas(previewCanvasRef.current, activeFilters, isLogoRemovalEnabled ? logoRegion : undefined);
+        const logoOpts = {
+            enabled: isLogoRemovalEnabled,
+            region: logoRegion,
+            fillType: logoFillType,
+            fillColor: logoFillColor,
+            blurStrength: logoBlurStrength
+        };
+
+        applyFiltersToCanvas(previewCanvasRef.current, activeFilters, logoOpts);
     };
 
     useEffect(() => {
         if (step === 2) {
             renderLivePreview();
         }
-    }, [step, filters, isBlackAndWhite, logoRegion, isLogoRemovalEnabled, previewPage]);
+    }, [step, filters, isBlackAndWhite, logoRegion, isLogoRemovalEnabled, previewPage, logoFillType, logoFillColor, logoBlurStrength]);
 
 
     // --- Output Generation ---
@@ -163,7 +173,16 @@ export default function ClassNotesPrintPage() {
                     activeFilters.grayscale = true;
                     activeFilters.contrast = 150;
                 }
-                applyFiltersToCanvas(canvas, activeFilters, isLogoRemovalEnabled ? logoRegion : undefined);
+
+                const logoOpts = {
+                    enabled: isLogoRemovalEnabled,
+                    region: logoRegion,
+                    fillType: logoFillType,
+                    fillColor: logoFillColor,
+                    blurStrength: logoBlurStrength
+                };
+
+                applyFiltersToCanvas(canvas, activeFilters, logoOpts);
 
                 const imgData = canvas.toDataURL('image/jpeg', 0.85);
 
@@ -342,13 +361,67 @@ export default function ClassNotesPrintPage() {
                                                 className="w-10 h-6 rounded-full appearance-none bg-slate-700 checked:bg-purple-500 transition relative after:absolute after:top-1 after:left-1 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition-all checked:after:translate-x-4 cursor-pointer"
                                             />
                                         </div>
+
+                                        {/* Advanced Fill Options */}
                                         {isLogoRemovalEnabled && (
-                                            <button
-                                                onClick={() => setShowLogoModal(true)}
-                                                className="w-full py-2 bg-slate-800 text-purple-400 text-sm font-medium rounded-lg border border-purple-500/20 hover:bg-slate-700 transition"
-                                            >
-                                                Adjust Logo Region
-                                            </button>
+                                            <div className="p-4 bg-slate-950/50 rounded-xl border border-white/5 space-y-4">
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-500 mb-2">Fill Method</label>
+                                                    <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-800">
+                                                        {(['white', 'black', 'custom', 'blur'] as const).map((type) => (
+                                                            <button
+                                                                key={type}
+                                                                onClick={() => setLogoFillType(type)}
+                                                                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition ${logoFillType === type ? 'bg-purple-500 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                                                            >
+                                                                {type.charAt(0).toUpperCase() + type.slice(1)}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Custom Color Input */}
+                                                {logoFillType === 'custom' && (
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-sm text-slate-300">Fill Color</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <input
+                                                                type="color"
+                                                                value={logoFillColor}
+                                                                onChange={(e) => setLogoFillColor(e.target.value)}
+                                                                className="w-8 h-8 rounded cursor-pointer bg-transparent border-none"
+                                                            />
+                                                            <span className="text-xs text-slate-500 font-mono">{logoFillColor}</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Blur Strength Slider */}
+                                                {logoFillType === 'blur' && (
+                                                    <div>
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <span className="text-sm text-slate-300">Blur Strength</span>
+                                                            <span className="text-xs text-purple-400 font-mono">{logoBlurStrength}px</span>
+                                                        </div>
+                                                        <input
+                                                            type="range"
+                                                            min="1"
+                                                            max="20"
+                                                            step="1"
+                                                            value={logoBlurStrength}
+                                                            onChange={(e) => setLogoBlurStrength(Number(e.target.value))}
+                                                            className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                <button
+                                                    onClick={() => setShowLogoModal(true)}
+                                                    className="w-full py-2 bg-slate-800 text-purple-400 text-sm font-medium rounded-lg border border-purple-500/20 hover:bg-slate-700 transition"
+                                                >
+                                                    Adjust Logo Region
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
