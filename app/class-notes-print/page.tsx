@@ -21,10 +21,13 @@ export default function ClassNotesPrintPage() {
     // Pipeline Steps: 0 = Upload, 1 = Select Pages, 2 = Configure/Preview
     const [step, setStep] = useState(0);
 
-    const [file, setFile] = useState<File | null>(null);
-    const [pdfRef, setPdfRef] = useState<any>(null);
+    const [files, setFiles] = useState<Array<{ file: File; pdfRef: any; pageCount: number }>>([]);
+    const [pdfRef, setPdfRef] = useState<any>(null); // Keep for compatibility, but use files array
     const [numPages, setNumPages] = useState(0);
     const [selectedPages, setSelectedPages] = useState<number[]>([]);
+    const [pageOrder, setPageOrder] = useState<number[]>([]); // Custom page order from drag-and-drop
+    const [pageToFileMap, setPageToFileMap] = useState<Record<number, number>>({}); // Maps global page number to file index
+    const [isImageMode, setIsImageMode] = useState(false); // Track if uploaded file is an image
     // const [isProcessing, setIsProcessing] = useState(false); // Replaced by step 3
     const [originalFileSize, setOriginalFileSize] = useState(0);
 
@@ -96,23 +99,107 @@ export default function ClassNotesPrintPage() {
 
     // --- Handlers ---
 
-    const handleFileSelected = async (files: File[]) => {
-        if (files.length === 0) return;
-        const selectedFile = files[0];
-        setFile(selectedFile);
-        setOriginalFileSize(selectedFile.size);
+    const handleFileSelected = async (newFiles: File[]) => {
+        if (newFiles.length === 0) return;
+
+        const totalOriginalSize = newFiles.reduce((sum, f) => sum + f.size, 0);
+        setOriginalFileSize(prev => prev + totalOriginalSize);
 
         try {
-            const pdfjs = await import("pdfjs-dist");
-            const buffer = await selectedFile.arrayBuffer();
-            const pdf = await pdfjs.getDocument(buffer).promise;
-            setPdfRef(pdf);
-            setNumPages(pdf.numPages);
-            setSelectedPages(Array.from({ length: pdf.numPages }, (_, i) => i + 1));
-            setStep(1); // Move to Page Selection
+            const loadedFiles = await Promise.all(newFiles.map(async (selectedFile) => {
+                // Check if it's an image
+                const isImage = selectedFile.type.startsWith('image/');
+
+                if (isImage) {
+                    setIsImageMode(true);
+
+                    // Load image and create a virtual "PDF" structure
+                    const img = new Image();
+                    const imgUrl = URL.createObjectURL(selectedFile);
+
+                    await new Promise<void>((resolve, reject) => {
+                        img.onload = () => {
+                            URL.revokeObjectURL(imgUrl);
+                            resolve();
+                        };
+                        img.onerror = () => {
+                            URL.revokeObjectURL(imgUrl);
+                            reject(new Error('Failed to load image'));
+                        };
+                        img.src = imgUrl;
+                    });
+
+                    // Create a mock PDF structure for images
+                    const mockPdf = {
+                        numPages: 1,
+                        getPage: async (pageNum: number) => ({
+                            getViewport: ({ scale, rotation = 0 }: any) => ({
+                                width: img.width * scale,
+                                height: img.height * scale,
+                                rotation
+                            }),
+                            render: ({ canvasContext, viewport }: any) => ({
+                                promise: new Promise<void>((res) => {
+                                    canvasContext.save();
+
+                                    if (viewport.rotation) {
+                                        const centerX = viewport.width / 2;
+                                        const centerY = viewport.height / 2;
+                                        canvasContext.translate(centerX, centerY);
+                                        canvasContext.rotate((viewport.rotation * Math.PI) / 180);
+                                        canvasContext.translate(-centerX, -centerY);
+                                    }
+
+                                    canvasContext.drawImage(img, 0, 0, viewport.width, viewport.height);
+                                    canvasContext.restore();
+                                    res();
+                                })
+                            })
+                        }),
+                        _imageElement: img
+                    };
+
+                    return { file: selectedFile, pdfRef: mockPdf, pageCount: 1 };
+                } else {
+                    // Handle PDF upload
+                    const pdfjs = await import("pdfjs-dist");
+                    const buffer = await selectedFile.arrayBuffer();
+                    const pdf = await pdfjs.getDocument(buffer).promise;
+                    return { file: selectedFile, pdfRef: pdf, pageCount: pdf.numPages };
+                }
+            }));
+
+            // Merge with existing files
+            const updatedFiles = [...files, ...loadedFiles];
+            setFiles(updatedFiles);
+
+            // Calculate total pages and create mapping
+            let globalPageNum = 1;
+            const newPageToFileMap: Record<number, number> = {};
+            const allPages: number[] = [];
+
+            updatedFiles.forEach((fileData, fileIndex) => {
+                for (let i = 0; i < fileData.pageCount; i++) {
+                    newPageToFileMap[globalPageNum] = fileIndex;
+                    allPages.push(globalPageNum);
+                    globalPageNum++;
+                }
+            });
+
+            setPageToFileMap(newPageToFileMap);
+            setNumPages(globalPageNum - 1);
+            setSelectedPages(allPages);
+            setPageOrder(allPages); // Initialize page order
+
+            // Set first file's ref as primary for compatibility
+            if (updatedFiles.length > 0) {
+                setPdfRef(updatedFiles[0].pdfRef);
+            }
+
+            setStep(1);
         } catch (error) {
             console.error(error);
-            toast.error("Failed to load PDF.");
+            toast.error("Failed to load file(s).");
         }
     };
 
@@ -145,10 +232,12 @@ export default function ClassNotesPrintPage() {
 
     const onProcessAnother = () => {
         setStep(0);
-        setFile(null);
+        setFiles([]);
         setPdfRef(null);
         setNumPages(0);
         setSelectedPages([]);
+        setPageOrder([]);
+        setPageToFileMap({});
         setOriginalFileSize(0);
         setProgressState({
             percent: 0,
@@ -186,18 +275,31 @@ export default function ClassNotesPrintPage() {
         setPageRotations({});
         setPageCrops({});
         setEditingPage(null);
+        setIsImageMode(false);
     };
 
 
 
     // --- Preview Logic ---
     const renderLivePreview = async () => {
-        if (!pdfRef || !previewCanvasRef.current) return;
+        if (!files.length || !previewCanvasRef.current || !selectedPages.includes(previewPage)) return;
+
+        // Find which file this page belongs to
+        const fileIndex = pageToFileMap[previewPage];
+        if (fileIndex === undefined) return;
+
+        const fileData = files[fileIndex];
+
+        // Calculate local page number within the file
+        let localPageNum = previewPage;
+        for (let i = 0; i < fileIndex; i++) {
+            localPageNum -= files[i].pageCount;
+        }
 
         // Render base page
         const rotation = pageRotations[previewPage] || 0;
         const crop = pageCrops[previewPage];
-        const canvas = await renderPageToCanvas(pdfRef, previewPage, 0.8, rotation, crop);
+        const canvas = await renderPageToCanvas(fileData.pdfRef, localPageNum, 0.8, rotation, crop);
         if (!canvas || !previewCanvasRef.current) return;
 
         const ctx = previewCanvasRef.current.getContext('2d');
@@ -296,7 +398,22 @@ export default function ClassNotesPrintPage() {
             }
 
             for (let i = 0; i < selectedPages.length; i++) {
-                const pageNum = selectedPages[i];
+                // Use pageOrder if available, otherwise fall back to selectedPages
+                const orderedPages = pageOrder.length > 0
+                    ? pageOrder.filter(p => selectedPages.includes(p))
+                    : selectedPages;
+
+                const globalPageNum = orderedPages[i];
+                const fileIndex = pageToFileMap[globalPageNum];
+                if (fileIndex === undefined) continue;
+
+                const fileData = files[fileIndex];
+
+                // Calculate local page number
+                let localPageNum = globalPageNum;
+                for (let j = 0; j < fileIndex; j++) {
+                    localPageNum -= files[j].pageCount;
+                }
 
                 // Update Progress
                 const elapsed = Date.now() - startTime;
@@ -324,9 +441,9 @@ export default function ClassNotesPrintPage() {
                         default: return 2.0;
                     }
                 };
-                const rotation = pageRotations[pageNum] || 0;
-                const crop = pageCrops[pageNum];
-                const canvas = await renderPageToCanvas(pdfRef, pageNum, getScale(), rotation, crop);
+                const rotation = pageRotations[globalPageNum] || 0;
+                const crop = pageCrops[globalPageNum];
+                const canvas = await renderPageToCanvas(fileData.pdfRef, localPageNum, getScale(), rotation, crop);
                 if (!canvas) continue;
 
                 // Apply logic
@@ -417,9 +534,12 @@ export default function ClassNotesPrintPage() {
                 <div className="max-w-3xl mx-auto space-y-8">
                     <FileDropZone
                         onFilesSelected={handleFileSelected}
-                        accept={{ "application/pdf": [".pdf"] }}
-                        maxFiles={1}
-                        title="Select Lecture Slides PDF"
+                        accept={{
+                            "application/pdf": [".pdf"],
+                            "image/*": [".jpg", ".jpeg", ".png", ".webp"]
+                        }}
+                        maxFiles={999}
+                        title="Select PDF or Images"
                         className="h-80 border-purple-500/20 hover:border-purple-500/50"
                     />
                 </div>
@@ -428,13 +548,17 @@ export default function ClassNotesPrintPage() {
             {/* Step 1: Page Selection */}
             {step === 1 && (
                 <PageSelector
-                    pdf={pdfRef}
+                    files={files}
+                    totalPages={numPages}
+                    pageToFileMap={pageToFileMap}
                     selectedPages={selectedPages}
                     onSelectionChange={setSelectedPages}
+                    onPageOrderChange={setPageOrder}
                     onNext={handlePageSelectionNext}
                     onBack={() => setStep(0)}
                     onEdit={handlePageEdit}
                     pageRotations={pageRotations}
+                    onAddMore={handleFileSelected}
                 />
             )}
 
@@ -924,7 +1048,7 @@ export default function ClassNotesPrintPage() {
             {/* Step 4: Success */}
             {step === 4 && (
                 <SuccessView
-                    fileName={file?.name.replace('.pdf', '_enhanced.pdf') || 'document_enhanced.pdf'}
+                    fileName={files.length > 0 ? files[0].file.name.replace(/\.(pdf|jpe?g|png|webp)$/i, '_enhanced.pdf') : 'document_enhanced.pdf'}
                     originalSize={formatBytes(originalFileSize || 0)}
                     finalSize={successData?.formattedSize || "0 MB"}
                     pageCount={successData?.pageCount || 0}
@@ -933,7 +1057,7 @@ export default function ClassNotesPrintPage() {
                             const url = URL.createObjectURL(successData.blob);
                             const a = document.createElement('a');
                             a.href = url;
-                            a.download = file?.name.replace('.pdf', '_class_notes.pdf') || "class-notes.pdf";
+                            a.download = files.length > 0 ? files[0].file.name.replace(/\.(pdf|jpe?g|png|webp)$/i, '_class_notes.pdf') : "class-notes.pdf";
                             document.body.appendChild(a);
                             a.click();
                             document.body.removeChild(a);
@@ -948,7 +1072,7 @@ export default function ClassNotesPrintPage() {
                     }}
                     onProcessAnother={() => {
                         setStep(0);
-                        setFile(null);
+                        setFiles([]);
                         setPdfRef(null);
                         setSelectedPages([]);
                         setIsLogoRemovalEnabled(false);

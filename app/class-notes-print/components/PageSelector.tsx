@@ -1,30 +1,60 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Check, CheckCircle2, Circle, Pencil, RotateCw } from "lucide-react";
+import { Check, CheckCircle2, Circle, Pencil, RotateCw, Plus } from "lucide-react";
 import { renderPageToCanvas } from "../../utils/class-notes-utils";
 import { motion } from "framer-motion";
 
 interface PageSelectorProps {
-    pdf: any;
+    files: Array<{ file: File; pdfRef: any; pageCount: number }>;
+    totalPages: number;
+    pageToFileMap: Record<number, number>;
     selectedPages: number[];
     onSelectionChange: (pages: number[]) => void;
+    onPageOrderChange: (order: number[]) => void;
     onNext: () => void;
     onBack: () => void;
     onEdit: (pageNum: number) => void;
-    pageRotations?: Record<number, number>;
+    pageRotations: Record<number, number>;
+    onAddMore?: (files: File[]) => void;
 }
 
-const PageThumbnail = ({ pdf, pageNum, isSelected, rotation, onClick, onEdit }: { pdf: any, pageNum: number, isSelected: boolean, rotation?: number, onClick: () => void, onEdit: (p: number) => void }) => {
+const PageThumbnail = ({
+    pdfRef,
+    pageNum,
+    globalPageNum,
+    isSelected,
+    rotation,
+    onClick,
+    onEdit,
+    isDragging,
+    onDragStart,
+    onDragEnd,
+    onDragOver,
+    onDrop
+}: {
+    pdfRef: any,
+    pageNum: number,
+    globalPageNum: number,
+    isSelected: boolean,
+    rotation?: number,
+    onClick: () => void,
+    onEdit: (p: number) => void,
+    isDragging: boolean,
+    onDragStart: (e: React.DragEvent) => void,
+    onDragEnd: () => void,
+    onDragOver: (e: React.DragEvent) => void,
+    onDrop: (e: React.DragEvent) => void
+}) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [loaded, setLoaded] = useState(false);
 
     useEffect(() => {
         let active = true;
         const render = async () => {
-            if (!pdf || loaded) return;
+            if (!pdfRef || loaded) return;
             // Render small thumbnail
-            const canvas = await renderPageToCanvas(pdf, pageNum, 0.3, rotation || 0);
+            const canvas = await renderPageToCanvas(pdfRef, pageNum, 0.5, rotation || 0);
             if (active && canvas && canvasRef.current) {
                 const ctx = canvasRef.current.getContext('2d');
                 if (ctx) {
@@ -37,12 +67,19 @@ const PageThumbnail = ({ pdf, pageNum, isSelected, rotation, onClick, onEdit }: 
         };
         render();
         return () => { active = false; };
-    }, [pdf, pageNum, rotation]);
+    }, [pdfRef, pageNum, rotation]);
 
     return (
         <div
-            onClick={onClick}
-            className={`relative group cursor-pointer border-2 rounded-xl overflow-hidden transition-all duration-200 ${isSelected ? 'border-cyan-500 ring-2 ring-cyan-500/20' : 'border-white/10 hover:border-white/30'}`}
+            draggable
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+            onDragOver={onDragOver}
+            onDrop={onDrop}
+            className={`relative group bg-slate-800 rounded-xl overflow-hidden cursor-move border-2 transition-all ${isSelected ? 'border-cyan-500 ring-2 ring-cyan-500/50' : 'border-transparent hover:border-white/20'
+                } ${isDragging ? 'opacity-50 scale-95' : 'hover:scale-[1.02]'
+                }`}
+            style={{ aspectRatio: '1 / 1.414' }}
         >
             <div className={`aspect-[1/1.41] bg-slate-900 flex items-center justify-center relative`}>
                 <canvas ref={canvasRef} className="w-full h-full object-contain" />
@@ -52,37 +89,60 @@ const PageThumbnail = ({ pdf, pageNum, isSelected, rotation, onClick, onEdit }: 
                 <div className={`absolute inset-0 transition-opacity bg-cyan-500/10 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
             </div>
 
+            {/* Selection Indicator */}
             <div className="absolute top-2 right-2 flex items-center gap-1.5">
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onEdit(pageNum);
-                    }}
-                    className="bg-slate-900/80 text-slate-300 hover:text-white rounded-full p-1.5 border border-white/10 hover:border-cyan-500/50 hover:bg-cyan-500/20 transition backdrop-blur-sm"
-                    title="Edit Page"
-                >
-                    <Pencil className="w-3 h-3" />
-                </button>
-
                 {isSelected ? (
-                    <div className="bg-cyan-500 text-white rounded-full p-1 shadow-lg">
+                    <div className="bg-cyan-500 text-white rounded-full p-1 shadow-lg" onClick={onClick}>
                         <Check className="w-3 h-3" />
                     </div>
                 ) : (
-                    <div className="bg-slate-900/80 text-slate-400 rounded-full p-1 border border-white/10 group-hover:border-white/50">
+                    <div className="bg-slate-900/80 text-slate-400 rounded-full p-1 border border-white/10 group-hover:border-white/50" onClick={onClick}>
                         <div className="w-3 h-3" />
                     </div>
                 )}
             </div>
 
+            {/* Drag Indicator */}
+            <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="bg-slate-950/80 rounded p-1 text-slate-400">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 8.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM11.5 15.5a1.5 1.5 0 10-3 0 1.5 1.5 0 003 0z"></path>
+                    </svg>
+                </div>
+            </div>
+
+            {/* Edit Button */}
+            <button
+                onClick={(e) => { e.stopPropagation(); onEdit(globalPageNum); }}
+                className="absolute top-2 right-10 bg-slate-950/80 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-purple-500 hover:scale-110 z-10"
+                title="Edit Page"
+            >
+                <Pencil className="w-3 h-3 text-slate-300" />
+            </button>
+
             <div className="absolute bottom-0 w-full bg-slate-950/80 backdrop-blur-sm py-1 text-center border-t border-white/5">
-                <span className={`text-xs font-mono ${isSelected ? 'text-cyan-400' : 'text-slate-400'}`}>Page {pageNum}</span>
+                <span className={`text-xs font-mono ${isSelected ? 'text-cyan-400' : 'text-slate-400'}`}>Page {globalPageNum}</span>
             </div>
         </div>
     );
 };
 
-export default function PageSelector({ pdf, selectedPages, onSelectionChange, onNext, onBack, onEdit, pageRotations }: PageSelectorProps) {
+export default function PageSelector({ files, totalPages, pageToFileMap, selectedPages, onSelectionChange, onPageOrderChange, onNext, onBack, onEdit, pageRotations, onAddMore }: PageSelectorProps) {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [draggedPage, setDraggedPage] = useState<number | null>(null);
+    const [pageOrder, setPageOrder] = useState<number[]>([]);
+
+    // Initialize page order
+    useEffect(() => {
+        setPageOrder(Array.from({ length: totalPages }, (_, i) => i + 1));
+    }, [totalPages]);
+
+    // Notify parent when page order changes
+    useEffect(() => {
+        if (pageOrder.length > 0) {
+            onPageOrderChange(pageOrder);
+        }
+    }, [pageOrder, onPageOrderChange]);
 
     const togglePage = (pageNum: number) => {
         if (selectedPages.includes(pageNum)) {
@@ -93,8 +153,7 @@ export default function PageSelector({ pdf, selectedPages, onSelectionChange, on
     };
 
     const selectAll = () => {
-        if (!pdf) return;
-        const all = Array.from({ length: pdf.numPages }, (_, i) => i + 1);
+        const all = Array.from({ length: totalPages }, (_, i) => i + 1);
         onSelectionChange(all);
     };
 
@@ -110,10 +169,35 @@ export default function PageSelector({ pdf, selectedPages, onSelectionChange, on
                 <div className="flex items-center gap-4">
                     <h3 className="text-lg font-bold text-white">Select Pages</h3>
                     <div className="h-6 w-px bg-white/10" />
-                    <span className="text-slate-400 text-sm">{selectedPages.length} of {pdf?.numPages} selected</span>
+                    <span className="text-slate-400 text-sm">{selectedPages.length} of {totalPages} selected</span>
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {onAddMore && (
+                        <>
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                className="px-3 py-1.5 text-xs font-medium text-purple-400 bg-purple-500/10 rounded-lg hover:bg-purple-500/20 transition flex items-center gap-1"
+                            >
+                                <Plus className="w-3.5 h-3.5" /> Add More Files
+                            </button>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                multiple
+                                accept="application/pdf,.pdf,image/*,.jpg,.jpeg,.png,.webp"
+                                className="hidden"
+                                onChange={(e) => {
+                                    const files = Array.from(e.target.files || []);
+                                    if (files.length > 0 && onAddMore) {
+                                        onAddMore(files);
+                                    }
+                                    e.target.value = ''; // Reset input
+                                }}
+                            />
+                            <div className="h-6 w-px bg-white/10" />
+                        </>
+                    )}
                     <button
                         onClick={selectAll}
                         className="px-3 py-1.5 text-xs font-medium text-cyan-400 bg-cyan-500/10 rounded-lg hover:bg-cyan-500/20 transition"
@@ -129,19 +213,59 @@ export default function PageSelector({ pdf, selectedPages, onSelectionChange, on
                 </div>
             </div>
 
-            {/* Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 max-h-[60vh] overflow-y-auto p-2 custom-scrollbar">
-                {pdf && Array.from({ length: pdf.numPages }, (_, i) => i + 1).map((pageNum) => (
-                    <PageThumbnail
-                        key={pageNum}
-                        pdf={pdf}
-                        pageNum={pageNum}
-                        isSelected={selectedPages.includes(pageNum)}
-                        onClick={() => togglePage(pageNum)}
-                        onEdit={onEdit}
-                        rotation={pageRotations?.[pageNum] || 0}
-                    />
-                ))}
+            {/* Pages Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 max-h-[60vh] overflow-y-auto p-2 custom-scrollbar">
+                {pageOrder.map((globalPageNum) => {
+                    const fileIndex = pageToFileMap[globalPageNum];
+                    if (fileIndex === undefined) return null;
+
+                    const fileData = files[fileIndex];
+
+                    // Calculate local page number within the file
+                    let localPageNum = globalPageNum;
+                    for (let j = 0; j < fileIndex; j++) {
+                        localPageNum -= files[j].pageCount;
+                    }
+
+                    return (
+                        <PageThumbnail
+                            key={globalPageNum}
+                            pdfRef={fileData.pdfRef}
+                            pageNum={localPageNum}
+                            globalPageNum={globalPageNum}
+                            isSelected={selectedPages.includes(globalPageNum)}
+                            rotation={pageRotations?.[globalPageNum]}
+                            onClick={() => togglePage(globalPageNum)}
+                            onEdit={onEdit}
+                            isDragging={draggedPage === globalPageNum}
+                            onDragStart={(e) => {
+                                setDraggedPage(globalPageNum);
+                                e.dataTransfer.effectAllowed = 'move';
+                                e.dataTransfer.setData('text/plain', globalPageNum.toString());
+                            }}
+                            onDragEnd={() => setDraggedPage(null)}
+                            onDragOver={(e) => {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = 'move';
+                            }}
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                if (draggedPage === null || draggedPage === globalPageNum) return;
+
+                                // Reorder pages
+                                const newOrder = [...pageOrder];
+                                const draggedIndex = newOrder.indexOf(draggedPage);
+                                const targetIndex = newOrder.indexOf(globalPageNum);
+
+                                newOrder.splice(draggedIndex, 1);
+                                newOrder.splice(targetIndex, 0, draggedPage);
+
+                                setPageOrder(newOrder);
+                                setDraggedPage(null);
+                            }}
+                        />
+                    );
+                })}
             </div>
 
             {/* Navigation Footer */}
