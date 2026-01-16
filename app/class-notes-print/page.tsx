@@ -1531,6 +1531,9 @@ export default function ClassNotesPrintPage() {
                     setLogoRegion(region);
                     setShowLogoModal(false);
                 }}
+                pageEdits={pageEdits}
+                pageRotations={pageRotations}
+                pageCrops={pageCrops}
             />
 
             {/* Page Edit Modal */}

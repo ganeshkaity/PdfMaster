@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect, MouseEvent } from "react";
+import { useState, useRef, useEffect, MouseEvent, TouchEvent } from "react";
 import { X, Check } from "lucide-react";
 import { renderPageToCanvas, LogoRegion } from "../../utils/class-notes-utils";
+
+import { CropRegion } from "./PageEditModal";
 
 interface InteractiveLogoRemoverProps {
     pdf: any; // PDF Document Proxy
@@ -10,9 +12,12 @@ interface InteractiveLogoRemoverProps {
     onClose: () => void;
     onApply: (region: LogoRegion) => void;
     initialRegion?: LogoRegion;
+    pageEdits: Record<number, string>;
+    pageRotations: Record<number, number>;
+    pageCrops: Record<number, CropRegion>;
 }
 
-export default function InteractiveLogoRemover({ pdf, isOpen, onClose, onApply, initialRegion }: InteractiveLogoRemoverProps) {
+export default function InteractiveLogoRemover({ pdf, isOpen, onClose, onApply, initialRegion, pageEdits, pageRotations, pageCrops }: InteractiveLogoRemoverProps) {
     const [pageNumber, setPageNumber] = useState(1);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -35,9 +40,46 @@ export default function InteractiveLogoRemover({ pdf, isOpen, onClose, onApply, 
 
     // Render logic (Background PDF)
     const renderPage = async (num: number) => {
-        if (!canvasRef.current) return;
-        // High quality render for selection
-        const canvas = await renderPageToCanvas(pdf, num, 1.5);
+        if (!canvasRef.current || !pdf) return;
+
+        const rotation = pageRotations[num] || 0;
+        const crop = pageCrops[num];
+        const editedImgData = pageEdits[num];
+
+        let canvas: HTMLCanvasElement | null = null;
+
+        if (editedImgData) {
+            // Use edited image
+            const img = new Image();
+            img.src = editedImgData;
+            await new Promise((resolve) => { img.onload = resolve; });
+
+            const baseCanvas = document.createElement('canvas');
+            baseCanvas.width = img.width;
+            baseCanvas.height = img.height;
+            const baseCtx = baseCanvas.getContext('2d');
+            baseCtx?.drawImage(img, 0, 0);
+
+            if (crop) {
+                const croppedCanvas = document.createElement('canvas');
+                const cw = (crop.width / 100) * baseCanvas.width;
+                const ch = (crop.height / 100) * baseCanvas.height;
+                const cx = (crop.x / 100) * baseCanvas.width;
+                const cy = (crop.y / 100) * baseCanvas.height;
+
+                croppedCanvas.width = cw;
+                croppedCanvas.height = ch;
+                const croppedCtx = croppedCanvas.getContext('2d');
+                croppedCtx?.drawImage(baseCanvas, cx, cy, cw, ch, 0, 0, cw, ch);
+                canvas = croppedCanvas;
+            } else {
+                canvas = baseCanvas;
+            }
+        } else {
+            // Render from PDF with rotation/crop
+            canvas = await renderPageToCanvas(pdf, num, 1.5, rotation, crop);
+        }
+
         if (canvas) {
             const ctx = canvasRef.current.getContext('2d');
             if (ctx) {
@@ -54,6 +96,7 @@ export default function InteractiveLogoRemover({ pdf, isOpen, onClose, onApply, 
             }
         }
     };
+
 
     // Draw Overlay (Selection Box)
     const drawOverlay = (region: LogoRegion | null) => {
@@ -99,18 +142,34 @@ export default function InteractiveLogoRemover({ pdf, isOpen, onClose, onApply, 
     }, [currentRegion]);
 
 
-    // Mouse Events
-    const getCoords = (e: MouseEvent) => {
+    // Mouse & Touch Events
+    const getCoords = (e: MouseEvent | TouchEvent) => {
         if (!overlayRef.current) return { x: 0, y: 0 };
         const rect = overlayRef.current.getBoundingClientRect();
+
+        let clientX = 0;
+        let clientY = 0;
+
+        if ('touches' in e && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else if ('clientX' in e) {
+            clientX = (e as MouseEvent).clientX;
+            clientY = (e as MouseEvent).clientY;
+        }
+
         return {
-            x: (e.clientX - rect.left) * (overlayRef.current.width / rect.width),
-            y: (e.clientY - rect.top) * (overlayRef.current.height / rect.height)
+            x: (clientX - rect.left) * (overlayRef.current.width / rect.width),
+            y: (clientY - rect.top) * (overlayRef.current.height / rect.height)
         };
     };
 
-    const handleMouseDown = (e: MouseEvent) => {
+    const handleMouseDown = (e: MouseEvent | TouchEvent) => {
         if (!currentRegion || !overlayRef.current) return;
+
+        // Prevent scrolling on touch
+        // e.preventDefault() might be needed but can't be called on React SyntheticEvent in some cases for passive listeners?
+        // React 18 handles this better usually. But let's try just logic first.
 
         const { x, y } = getCoords(e);
         const w = overlayRef.current.width;
@@ -132,7 +191,7 @@ export default function InteractiveLogoRemover({ pdf, isOpen, onClose, onApply, 
         }
     };
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMouseMove = (e: MouseEvent | TouchEvent) => {
         const { x, y } = getCoords(e);
 
         // Change cursor if hovering over box
@@ -212,11 +271,14 @@ export default function InteractiveLogoRemover({ pdf, isOpen, onClose, onApply, 
                         <canvas ref={canvasRef} className="block max-w-full" style={{ maxHeight: '55vh' }} />
                         <canvas
                             ref={overlayRef}
-                            className="absolute inset-0 w-full h-full"
+                            className="absolute inset-0 w-full h-full touch-none"
                             onMouseDown={handleMouseDown}
                             onMouseMove={handleMouseMove}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}
+                            onTouchStart={handleMouseDown}
+                            onTouchMove={handleMouseMove}
+                            onTouchEnd={handleMouseUp}
                         />
                     </div>
                 </div>
