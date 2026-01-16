@@ -261,7 +261,7 @@ export default function SplitPdfPage() {
                         >
                             <CheckCircle2 className={`w-6 h-6 ${splitMode === "select" ? "text-cyan-400" : "text-slate-400"}`} />
                             <h4 className="font-bold text-white">Select Pages</h4>
-                            <p className="text-sm text-slate-400">Extract specific pages to a single new PDF.</p>
+                            <p className="text-sm text-slate-400">Extract specific pages as a separate PDF/png/jpg file (ZIP download).</p>
                         </button>
                     </div>
 
