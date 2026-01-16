@@ -702,7 +702,13 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
 
                     {/* Preview & Crop - 65% on desktop */}
                     <div className="flex-1 lg:w-[65%] relative bg-slate-950/50 flex items-center justify-center p-3 sm:p-6 overflow-auto min-h-[300px] lg:min-h-0">
-                        <div className="relative shadow-2xl lg:mt-32">
+                        <div
+                            className="relative shadow-2xl lg:mt-32 transition-transform duration-200"
+                            style={{
+                                transform: `scale(${zoomLevel}) translate(${panOffset.x}px, ${panOffset.y}px)`,
+                                transformOrigin: 'center center'
+                            }}
+                        >
                             <canvas ref={canvasRef} className="max-w-full max-h-[40vh] sm:max-h-[50vh] lg:max-h-[75vh] object-contain block" />
                             <canvas
                                 ref={overlayRef}
