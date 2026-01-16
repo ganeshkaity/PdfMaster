@@ -44,6 +44,11 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
     // Edit history for undo
     const [editHistory, setEditHistory] = useState<ImageData[]>([]);
 
+    // Zoom and Pan controls
+    const [zoomLevel, setZoomLevel] = useState(1);
+    const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+    const [isLocked, setIsLocked] = useState(false);
+
     // Initialize state when modal opens
     useEffect(() => {
         if (isOpen) {
@@ -52,6 +57,9 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
             setCurrentSelection(null);
             setEditHistory([]);
             setEnableCrop(!!initialCrop);
+            setZoomLevel(1);
+            setPanOffset({ x: 0, y: 0 });
+            setIsLocked(false);
         }
     }, [isOpen, initialRotation, initialCrop, pageNumber]);
 
@@ -655,6 +663,35 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
                         </button>
                         <button onClick={() => setRotation(r => (r + 90) % 360)} className="p-1.5 sm:p-2 hover:bg-white/10 rounded-lg text-slate-300" title="Rotate Right">
                             <RotateCw className="w-4 h-4 sm:w-5 sm:h-5" />
+                        </button>
+
+                        {/* Zoom Controls */}
+                        <div className="w-px bg-white/10 mx-1"></div>
+                        <button
+                            onClick={() => setZoomLevel(z => Math.min(z + 0.5, 3))}
+                            disabled={zoomLevel >= 3}
+                            className="p-1.5 sm:p-2 hover:bg-white/10 rounded-lg text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed font-bold text-lg"
+                            title="Zoom In"
+                        >
+                            +
+                        </button>
+                        <button
+                            onClick={() => setZoomLevel(z => Math.max(z - 0.5, 0.5))}
+                            disabled={zoomLevel <= 0.5}
+                            className="p-1.5 sm:p-2 hover:bg-white/10 rounded-lg text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed font-bold text-lg"
+                            title="Zoom Out"
+                        >
+                            −
+                        </button>
+                        <span className="px-2 flex items-center text-xs text-slate-400">{Math.round(zoomLevel * 100)}%</span>
+
+                        {/* Lock Button */}
+                        <button
+                            onClick={() => setIsLocked(!isLocked)}
+                            className={`p-1.5 sm:p-2 hover:bg-white/10 rounded-lg transition ${isLocked ? 'text-yellow-400 bg-yellow-500/20' : 'text-slate-300'}`}
+                            title={isLocked ? "Unlock Pan/Drag" : "Lock Pan/Drag"}
+                        >
+                            {isLocked ? '🔒' : '🔓'}
                         </button>
                     </div>
                 </div>
