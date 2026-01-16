@@ -865,6 +865,8 @@ export default function ClassNotesPrintPage() {
                     onBack={() => setStep(0)}
                     onEdit={handlePageEdit}
                     pageRotations={pageRotations}
+                    pageCrops={pageCrops}
+                    pageEdits={pageEdits}
                     onAddMore={handleFileSelected}
                 />
             )}

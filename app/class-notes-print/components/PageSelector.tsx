@@ -5,6 +5,8 @@ import { Check, CheckCircle2, Circle, Pencil, RotateCw, Plus, ArrowUp, ArrowDown
 import { renderPageToCanvas } from "../../utils/class-notes-utils";
 import { motion } from "framer-motion";
 
+import { CropRegion } from "./PageEditModal";
+
 interface PageSelectorProps {
     files: Array<{ file: File; pdfRef: any; pageCount: number }>;
     totalPages: number;
@@ -16,6 +18,8 @@ interface PageSelectorProps {
     onBack: () => void;
     onEdit: (pageNum: number) => void;
     pageRotations: Record<number, number>;
+    pageCrops: Record<number, CropRegion>;
+    pageEdits: Record<number, string>;
     onAddMore?: (files: File[]) => void;
 }
 
@@ -25,6 +29,7 @@ const PageThumbnail = ({
     globalPageNum,
     isSelected,
     rotation,
+    isEdited,
     onClick,
     onEdit,
     isDragging,
@@ -42,6 +47,7 @@ const PageThumbnail = ({
     globalPageNum: number,
     isSelected: boolean,
     rotation?: number,
+    isEdited?: boolean,
     onClick: () => void,
     onEdit: (p: number) => void,
     isDragging: boolean,
@@ -164,14 +170,19 @@ const PageThumbnail = ({
                 </button>
             </div>
 
-            <div className="absolute bottom-0 w-full bg-slate-950/80 backdrop-blur-sm py-1 text-center border-t border-white/5">
-                <span className={`text-xs font-mono ${isSelected ? 'text-cyan-400' : 'text-slate-400'}`}>Page {globalPageNum}</span>
+            <div className="absolute bottom-0 w-full bg-slate-950/80 backdrop-blur-sm py-1 text-center border-t border-white/5 flex flex-col items-center justify-center">
+                {isEdited && (
+                    <span className="text-[9px] font-bold text-green-500 uppercase tracking-wider leading-none mb-0.5">
+                        Edited
+                    </span>
+                )}
+                <span className={`text-xs font-mono leading-none ${isSelected ? 'text-cyan-400' : 'text-slate-400'}`}>Page {globalPageNum}</span>
             </div>
         </div>
     );
 };
 
-export default function PageSelector({ files, totalPages, pageToFileMap, selectedPages, onSelectionChange, onPageOrderChange, onNext, onBack, onEdit, pageRotations, onAddMore }: PageSelectorProps) {
+export default function PageSelector({ files, totalPages, pageToFileMap, selectedPages, onSelectionChange, onPageOrderChange, onNext, onBack, onEdit, pageRotations, pageCrops, pageEdits, onAddMore }: PageSelectorProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [draggedPage, setDraggedPage] = useState<number | null>(null);
     const [pageOrder, setPageOrder] = useState<number[]>([]);
@@ -299,6 +310,11 @@ export default function PageSelector({ files, totalPages, pageToFileMap, selecte
                             globalPageNum={globalPageNum}
                             isSelected={selectedPages.includes(globalPageNum)}
                             rotation={pageRotations?.[globalPageNum]}
+                            isEdited={
+                                (pageRotations?.[globalPageNum] !== undefined && pageRotations[globalPageNum] !== 0) ||
+                                !!pageCrops?.[globalPageNum] ||
+                                !!pageEdits?.[globalPageNum]
+                            }
                             onClick={() => togglePage(globalPageNum)}
                             onEdit={onEdit}
                             isDragging={draggedPage === globalPageNum}
