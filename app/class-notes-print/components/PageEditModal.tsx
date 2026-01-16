@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, MouseEvent } from "react";
-import { X, Check, RotateCw, RotateCcw, Image, Search } from "lucide-react";
+import { useState, useRef, useEffect, MouseEvent, TouchEvent } from "react";
+import { X, Check, RotateCw, RotateCcw, Image, Undo2 } from "lucide-react";
 import { renderPageToCanvas, LogoRegion } from "../../utils/class-notes-utils";
 
 // Define CropRegion same as LogoRegion for now (x, y, w, h in percentages)
@@ -23,19 +23,35 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
     const [rotation, setRotation] = useState(initialRotation);
     const [crop, setCrop] = useState<CropRegion | null>(initialCrop || null);
 
-    // Interaction State
-    const [interaction, setInteraction] = useState<{
-        type: 'move' | 'resize-tl' | 'resize-tr' | 'resize-bl' | 'resize-br' | 'resize-t' | 'resize-b' | 'resize-l' | 'resize-r' | 'none';
-        startX: number;
-        startY: number;
-        startCrop: CropRegion;
-    }>({ type: 'none', startX: 0, startY: 0, startCrop: { x: 0, y: 0, width: 0, height: 0 } });
+    // Selection and Edit Controls
+    const [enableCrop, setEnableCrop] = useState(!!initialCrop);
+    const [selectionTool, setSelectionTool] = useState<'rectangle' | 'circle'>('rectangle');
+    const [editAction, setEditAction] = useState<'invert' | 'paintBlack'>('invert');
+
+    // Current selection being drawn
+    const [currentSelection, setCurrentSelection] = useState<{
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        tool: 'rectangle' | 'circle';
+    } | null>(null);
+
+    // Drawing state
+    const [isDrawing, setIsDrawing] = useState(false);
+    const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
+
+    // Edit history for undo
+    const [editHistory, setEditHistory] = useState<ImageData[]>([]);
 
     // Initialize state when modal opens
     useEffect(() => {
         if (isOpen) {
             setRotation(initialRotation);
-            setCrop(initialCrop || null); // Reset or use initial
+            setCrop(initialCrop || null);
+            setCurrentSelection(null);
+            setEditHistory([]);
+            setEnableCrop(!!initialCrop);
         }
     }, [isOpen, initialRotation, initialCrop, pageNumber]);
 
@@ -67,15 +83,29 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
         renderCanvas();
     }, [isOpen, pageNumber, pdf, rotation]);
 
-    // Redraw Overlay when Crop changes
+    // Redraw overlay when selection or crop changes
     useEffect(() => {
         drawOverlay();
-    }, [crop]);
+    }, [currentSelection, crop]);
+
+    // Animation loop for marching ants effect on crop box
+    useEffect(() => {
+        if (!enableCrop || !crop) return;
+
+        let animationId: number;
+        const animate = () => {
+            drawOverlay();
+            animationId = requestAnimationFrame(animate);
+        };
+        animationId = requestAnimationFrame(animate);
+
+        return () => cancelAnimationFrame(animationId);
+    }, [enableCrop, crop]);
 
     const renderCanvas = async () => {
         if (!canvasRef.current || !overlayRef.current) return;
 
-        // Render with rotation!
+        // Render with rotation
         const canvas = await renderPageToCanvas(pdf, pageNumber, 1.5, rotation);
         if (canvas) {
             const ctx = canvasRef.current.getContext('2d');
@@ -88,10 +118,10 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
                 overlayRef.current.width = canvas.width;
                 overlayRef.current.height = canvas.height;
 
-                // Initialize crop to full page if null, OR don't show any if we want optional crop
-                // User prompt implies we want to CROP, so maybe init default usually?
-                // For now, let's keep it null until they start cropping or select a preset, 
-                // OR initialize to 90% view if that's better. Let's start null (full page)
+                // Save initial state for undo
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                setEditHistory([imageData]);
+
                 drawOverlay();
             }
         }
@@ -105,195 +135,348 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Darken background
-        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Draw current selection with blue dashed border
+        if (currentSelection) {
+            const { x, y, width, height, tool } = currentSelection;
 
-        if (!crop) {
-            // If no crop defined, maybe show full page as "selected" visually or nothing?
-            // If dragging "handles" on full page...
-            // Let's default: If crop is null, we show the WHOLE page as clear
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            return;
+            // Dim the rest of the image
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Clear the selection area
+            ctx.clearRect(x, y, width, height);
+
+            // Draw selection border (blue dashed)
+            ctx.strokeStyle = '#3B82F6'; // Blue
+            ctx.lineWidth = 2;
+            ctx.setLineDash([8, 4]); // Dashed line
+
+            if (tool === 'rectangle') {
+                ctx.strokeRect(x, y, width, height);
+            } else {
+                // Circle
+                const centerX = x + width / 2;
+                const centerY = y + height / 2;
+                const radius = Math.min(width, height) / 2;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                ctx.stroke();
+            }
+
+            ctx.setLineDash([]); // Reset
+
+            // Draw corner handles (small blue squares)
+            const handleSize = 8;
+            ctx.fillStyle = '#3B82F6';
+
+            // Top-left
+            ctx.fillRect(x - handleSize / 2, y - handleSize / 2, handleSize, handleSize);
+            // Top-right
+            ctx.fillRect(x + width - handleSize / 2, y - handleSize / 2, handleSize, handleSize);
+            // Bottom-left
+            ctx.fillRect(x - handleSize / 2, y + height - handleSize / 2, handleSize, handleSize);
+            // Bottom-right
+            ctx.fillRect(x + width - handleSize / 2, y + height - handleSize / 2, handleSize, handleSize);
         }
 
-        const w = canvas.width;
-        const h = canvas.height;
+        // Draw crop box if enabled
+        if (enableCrop && crop) {
+            const xPx = (crop.x / 100) * canvas.width;
+            const yPx = (crop.y / 100) * canvas.height;
+            const wPx = (crop.width / 100) * canvas.width;
+            const hPx = (crop.height / 100) * canvas.height;
 
-        const xPx = (crop.x / 100) * w;
-        const yPx = (crop.y / 100) * h;
-        const wPx = (crop.width / 100) * w;
-        const hPx = (crop.height / 100) * h;
+            // Dim background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Clear the crop region (make it transparent)
-        ctx.clearRect(xPx, yPx, wPx, hPx);
+            // Clear crop area
+            ctx.clearRect(xPx, yPx, wPx, hPx);
 
-        // Draw Border
-        ctx.strokeStyle = "#06b6d4"; // cyan-500
-        ctx.lineWidth = 2;
-        ctx.strokeRect(xPx, yPx, wPx, hPx);
+            // Animated dashed border (marching ants)
+            ctx.strokeStyle = '#f97316'; // Orange for crop
+            ctx.lineWidth = 2;
+            ctx.setLineDash([8, 4]); // Dashed line
+            ctx.lineDashOffset = -(Date.now() / 20) % 12; // Animated offset
+            ctx.strokeRect(xPx, yPx, wPx, hPx);
+            ctx.setLineDash([]); // Reset
 
-        // Draw Grid (Rule of Thirds)
-        ctx.strokeStyle = "rgba(6, 182, 212, 0.3)";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        // Verticals
-        ctx.moveTo(xPx + wPx / 3, yPx);
-        ctx.lineTo(xPx + wPx / 3, yPx + hPx);
-        ctx.moveTo(xPx + (wPx * 2) / 3, yPx);
-        ctx.lineTo(xPx + (wPx * 2) / 3, yPx + hPx);
-        // Horizontals
-        ctx.moveTo(xPx, yPx + hPx / 3);
-        ctx.lineTo(xPx + wPx, yPx + hPx / 3);
-        ctx.moveTo(xPx, yPx + (hPx * 2) / 3);
-        ctx.lineTo(xPx + wPx, yPx + (hPx * 2) / 3);
-        ctx.stroke();
+            // Draw handle dots (circles)
+            const dotSize = 10;
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#f97316';
+            ctx.lineWidth = 2;
 
-        // Draw Handles
-        const handleSize = 8;
-        ctx.fillStyle = "#ffffff";
+            const drawDot = (x: number, y: number) => {
+                ctx.beginPath();
+                ctx.arc(x, y, dotSize / 2, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+            };
 
-        // Corners
-        const drawHandle = (hx: number, hy: number) => {
-            ctx.fillRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
-        };
+            // 4 Corners
+            drawDot(xPx, yPx); // Top-left
+            drawDot(xPx + wPx, yPx); // Top-right
+            drawDot(xPx, yPx + hPx); // Bottom-left
+            drawDot(xPx + wPx, yPx + hPx); // Bottom-right
 
-        drawHandle(xPx, yPx); // TL
-        drawHandle(xPx + wPx, yPx); // TR
-        drawHandle(xPx, yPx + hPx); // BL
-        drawHandle(xPx + wPx, yPx + hPx); // BR
-
-        // Midpoints
-        drawHandle(xPx + wPx / 2, yPx); // Top
-        drawHandle(xPx + wPx / 2, yPx + hPx); // Bottom
-        drawHandle(xPx, yPx + hPx / 2); // Left
-        drawHandle(xPx + wPx, yPx + hPx / 2); // Right
+            // 4 Midpoints
+            drawDot(xPx + wPx / 2, yPx); // Top-middle
+            drawDot(xPx + wPx / 2, yPx + hPx); // Bottom-middle
+            drawDot(xPx, yPx + hPx / 2); // Left-middle
+            drawDot(xPx + wPx, yPx + hPx / 2); // Right-middle
+        }
     };
 
     // --- Interaction Logic ---
-    const getEvtPos = (e: MouseEvent) => {
+    // Get coordinates from mouse or touch event
+    const getCoords = (e: MouseEvent<HTMLCanvasElement> | TouchEvent<HTMLCanvasElement>): { x: number; y: number } => {
         if (!overlayRef.current) return { x: 0, y: 0 };
         const rect = overlayRef.current.getBoundingClientRect();
+
+        let clientX, clientY;
+        if ('touches' in e) {
+            // Touch event
+            if (e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                return { x: 0, y: 0 };
+            }
+        } else {
+            // Mouse event
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+
         const scaleX = overlayRef.current.width / rect.width;
         const scaleY = overlayRef.current.height / rect.height;
         return {
-            x: (e.clientX - rect.left) * scaleX,
-            y: (e.clientY - rect.top) * scaleY
+            x: (clientX - rect.left) * scaleX,
+            y: (clientY - rect.top) * scaleY
         };
     };
 
-    const handleMouseDown = (e: MouseEvent) => {
-        if (!crop || !overlayRef.current) {
-            // New Crop Init on Drag if null?
-            // Or just initiate crop as full then resize? 
-            // Let's auto-init crop to full 90% center if they click to start
-            if (!crop) {
+
+
+
+
+    // Crop interaction state
+    const [cropInteraction, setCropInteraction] = useState<{
+        type: 'move' | 'resize-tl' | 'resize-tr' | 'resize-bl' | 'resize-br' | 'none';
+        startX: number;
+        startY: number;
+        startCrop: CropRegion;
+    }>({ type: 'none', startX: 0, startY: 0, startCrop: { x: 0, y: 0, width: 0, height: 0 } });
+
+    // Start drawing selection or crop interaction
+    const handlePointerDown = (e: MouseEvent<HTMLCanvasElement> | TouchEvent<HTMLCanvasElement>) => {
+        const coords = getCoords(e);
+
+        if (enableCrop) {
+            // Crop mode: check if clicking on crop box to move/resize
+            if (!crop || !overlayRef.current) {
+                // Initialize crop if none exists
                 const init: CropRegion = { x: 10, y: 10, width: 80, height: 80 };
                 setCrop(init);
-                // Can't drag immediately this frame easily without specialized logic, 
-                // so just init crop for now. 
                 return;
             }
-            return;
-        }
 
-        const { x, y } = getEvtPos(e);
-        const w = overlayRef.current.width;
-        const h = overlayRef.current.height;
+            const w = overlayRef.current.width;
+            const h = overlayRef.current.height;
+            const xPx = (crop.x / 100) * w;
+            const yPx = (crop.y / 100) * h;
+            const wPx = (crop.width / 100) * w;
+            const hPx = (crop.height / 100) * h;
 
-        const xPx = (crop.x / 100) * w;
-        const yPx = (crop.y / 100) * h;
-        const wPx = (crop.width / 100) * w;
-        const hPx = (crop.height / 100) * h;
+            const handleSize = 20; // Larger hit area for touch
+            const hit = (hx: number, hy: number) => Math.abs(coords.x - hx) <= handleSize && Math.abs(coords.y - hy) <= handleSize;
 
-        const handleSize = 15; // Increased hit area for easier grabbing
-        const hit = (hx: number, hy: number) => Math.abs(x - hx) <= handleSize && Math.abs(y - hy) <= handleSize;
-
-        // Check Handles
-        if (hit(xPx, yPx)) setInteraction({ type: 'resize-tl', startX: x, startY: y, startCrop: crop });
-        else if (hit(xPx + wPx, yPx)) setInteraction({ type: 'resize-tr', startX: x, startY: y, startCrop: crop });
-        else if (hit(xPx, yPx + hPx)) setInteraction({ type: 'resize-bl', startX: x, startY: y, startCrop: crop });
-        else if (hit(xPx + wPx, yPx + hPx)) setInteraction({ type: 'resize-br', startX: x, startY: y, startCrop: crop });
-        // Mids
-        else if (hit(xPx + wPx / 2, yPx)) setInteraction({ type: 'resize-t', startX: x, startY: y, startCrop: crop });
-        else if (hit(xPx + wPx / 2, yPx + hPx)) setInteraction({ type: 'resize-b', startX: x, startY: y, startCrop: crop });
-        else if (hit(xPx, yPx + hPx / 2)) setInteraction({ type: 'resize-l', startX: x, startY: y, startCrop: crop });
-        else if (hit(xPx + wPx, yPx + hPx / 2)) setInteraction({ type: 'resize-r', startX: x, startY: y, startCrop: crop });
-        // Body (Move)
-        else if (x >= xPx && x <= xPx + wPx && y >= yPx && y <= yPx + hPx) {
-            setInteraction({ type: 'move', startX: x, startY: y, startCrop: crop });
+            // Check corner handles
+            if (hit(xPx, yPx)) {
+                setCropInteraction({ type: 'resize-tl', startX: coords.x, startY: coords.y, startCrop: crop });
+            } else if (hit(xPx + wPx, yPx)) {
+                setCropInteraction({ type: 'resize-tr', startX: coords.x, startY: coords.y, startCrop: crop });
+            } else if (hit(xPx, yPx + hPx)) {
+                setCropInteraction({ type: 'resize-bl', startX: coords.x, startY: coords.y, startCrop: crop });
+            } else if (hit(xPx + wPx, yPx + hPx)) {
+                setCropInteraction({ type: 'resize-br', startX: coords.x, startY: coords.y, startCrop: crop });
+            } else if (coords.x >= xPx && coords.x <= xPx + wPx && coords.y >= yPx && coords.y <= yPx + hPx) {
+                // Inside crop box - move
+                setCropInteraction({ type: 'move', startX: coords.x, startY: coords.y, startCrop: crop });
+            }
+        } else {
+            // Selection mode: start drawing selection
+            setIsDrawing(true);
+            setDrawStart(coords);
+            setCurrentSelection(null);
         }
     };
 
-    const handleMouseMove = (e: MouseEvent) => {
-        if (interaction.type === 'none' || !crop || !overlayRef.current) return;
+    // Update selection or crop while dragging
+    const handlePointerMove = (e: MouseEvent<HTMLCanvasElement> | TouchEvent<HTMLCanvasElement>) => {
+        if (enableCrop) {
+            // Crop mode: resize/move crop box
+            if (cropInteraction.type === 'none' || !crop || !overlayRef.current) return;
 
-        const { x, y } = getEvtPos(e);
-        const dx = x - interaction.startX;
-        const dy = y - interaction.startY;
+            const coords = getCoords(e);
+            const dx = coords.x - cropInteraction.startX;
+            const dy = coords.y - cropInteraction.startY;
 
-        const wCanvas = overlayRef.current.width;
-        const hCanvas = overlayRef.current.height;
+            const wCanvas = overlayRef.current.width;
+            const hCanvas = overlayRef.current.height;
 
-        // Convert px delta to % delta
-        const dxPct = (dx / wCanvas) * 100;
-        const dyPct = (dy / hCanvas) * 100;
+            // Convert px delta to % delta
+            const dxPct = (dx / wCanvas) * 100;
+            const dyPct = (dy / hCanvas) * 100;
 
-        let newCrop = { ...interaction.startCrop };
+            let newCrop = { ...cropInteraction.startCrop };
 
-        // Helper to Clamp 
-        const clamp = (val: number, min: number, max: number) => Math.min(Math.max(val, min), max);
+            const clamp = (val: number, min: number, max: number) => Math.min(Math.max(val, min), max);
 
-        switch (interaction.type) {
-            case 'move':
-                newCrop.x = clamp(newCrop.x + dxPct, 0, 100 - newCrop.width);
-                newCrop.y = clamp(newCrop.y + dyPct, 0, 100 - newCrop.height);
-                break;
-            case 'resize-tl':
-                newCrop.x += dxPct; newCrop.width -= dxPct;
-                newCrop.y += dyPct; newCrop.height -= dyPct;
-                break;
-            case 'resize-tr':
-                newCrop.y += dyPct; newCrop.height -= dyPct;
-                newCrop.width += dxPct;
-                break;
-            case 'resize-bl':
-                newCrop.x += dxPct; newCrop.width -= dxPct;
-                newCrop.height += dyPct;
-                break;
-            case 'resize-br':
-                newCrop.width += dxPct;
-                newCrop.height += dyPct;
-                break;
-            case 'resize-t':
-                newCrop.y += dyPct; newCrop.height -= dyPct;
-                break;
-            case 'resize-b':
-                newCrop.height += dyPct;
-                break;
-            case 'resize-l':
-                newCrop.x += dxPct; newCrop.width -= dxPct;
-                break;
-            case 'resize-r':
-                newCrop.width += dxPct;
-                break;
+            switch (cropInteraction.type) {
+                case 'move':
+                    newCrop.x = clamp(newCrop.x + dxPct, 0, 100 - newCrop.width);
+                    newCrop.y = clamp(newCrop.y + dyPct, 0, 100 - newCrop.height);
+                    break;
+                case 'resize-tl':
+                    newCrop.x += dxPct;
+                    newCrop.width -= dxPct;
+                    newCrop.y += dyPct;
+                    newCrop.height -= dyPct;
+                    break;
+                case 'resize-tr':
+                    newCrop.y += dyPct;
+                    newCrop.height -= dyPct;
+                    newCrop.width += dxPct;
+                    break;
+                case 'resize-bl':
+                    newCrop.x += dxPct;
+                    newCrop.width -= dxPct;
+                    newCrop.height += dyPct;
+                    break;
+                case 'resize-br':
+                    newCrop.width += dxPct;
+                    newCrop.height += dyPct;
+                    break;
+            }
+
+            // Bounds checking
+            if (newCrop.width < 5) newCrop.width = 5;
+            if (newCrop.height < 5) newCrop.height = 5;
+            if (newCrop.x < 0) newCrop.x = 0;
+            if (newCrop.y < 0) newCrop.y = 0;
+            if (newCrop.x + newCrop.width > 100) newCrop.width = 100 - newCrop.x;
+            if (newCrop.y + newCrop.height > 100) newCrop.height = 100 - newCrop.y;
+
+            setCrop(newCrop);
+        } else {
+            // Selection mode: update selection bounds
+            if (!isDrawing || !drawStart) return;
+
+            const coords = getCoords(e);
+            const width = coords.x - drawStart.x;
+            const height = coords.y - drawStart.y;
+
+            setCurrentSelection({
+                x: width < 0 ? coords.x : drawStart.x,
+                y: height < 0 ? coords.y : drawStart.y,
+                width: Math.abs(width),
+                height: Math.abs(height),
+                tool: selectionTool
+            });
         }
-
-        // Sanity Check Width/Height > Min
-        if (newCrop.width < 5) newCrop.width = 5;
-        if (newCrop.height < 5) newCrop.height = 5;
-
-        // Sanity Check Bounds (simplified, preventing negative width expansion issues could be complex, keeping simple)
-        if (newCrop.x < 0) newCrop.x = 0;
-        if (newCrop.y < 0) newCrop.y = 0;
-        if (newCrop.x + newCrop.width > 100) newCrop.width = 100 - newCrop.x;
-        if (newCrop.y + newCrop.height > 100) newCrop.height = 100 - newCrop.y;
-
-        setCrop(newCrop);
     };
 
-    const handleMouseUp = () => {
-        setInteraction({ type: 'none', startX: 0, startY: 0, startCrop: { x: 0, y: 0, width: 0, height: 0 } });
+    // Finish drawing selection or crop interaction
+    const handlePointerUp = () => {
+        if (enableCrop) {
+            setCropInteraction({ type: 'none', startX: 0, startY: 0, startCrop: { x: 0, y: 0, width: 0, height: 0 } });
+        } else {
+            setIsDrawing(false);
+            setDrawStart(null);
+        }
+    };
+
+    // Apply edit action to selected area
+    const applyEditAction = () => {
+        if (!currentSelection || !canvasRef.current) return;
+
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return;
+
+        // Save current state for undo
+        const currentState = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        setEditHistory(prev => [...prev, currentState]);
+
+        const { x, y, width, height, tool } = currentSelection;
+
+        // Get pixel data
+        const imageData = ctx.getImageData(x, y, width, height);
+        const data = imageData.data;
+
+        if (tool === 'rectangle') {
+            // Apply action to rectangle
+            applyPixelAction(data, editAction);
+            ctx.putImageData(imageData, x, y);
+        } else {
+            // Apply action to circle using mask
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = width;
+            tempCanvas.height = height;
+            const tempCtx = tempCanvas.getContext('2d');
+            if (tempCtx) {
+                // Create circular mask
+                tempCtx.beginPath();
+                tempCtx.arc(width / 2, height / 2, Math.min(width, height) / 2, 0, 2 * Math.PI);
+                tempCtx.clip();
+
+                // Draw original data
+                tempCtx.putImageData(imageData, 0, 0);
+
+                // Get clipped data and apply action
+                const clippedData = tempCtx.getImageData(0, 0, width, height);
+                applyPixelAction(clippedData.data, editAction);
+
+                // Put back
+                ctx.putImageData(clippedData, x, y);
+            }
+        }
+
+        // Clear selection after applying
+        setCurrentSelection(null);
+    };
+
+    // Apply pixel-level transformations
+    const applyPixelAction = (data: Uint8ClampedArray, action: 'invert' | 'paintBlack') => {
+        for (let i = 0; i < data.length; i += 4) {
+            if (action === 'invert') {
+                data[i] = 255 - data[i];       // R
+                data[i + 1] = 255 - data[i + 1]; // G
+                data[i + 2] = 255 - data[i + 2]; // B
+            } else if (action === 'paintBlack') {
+                data[i] = 0;      // R
+                data[i + 1] = 0;  // G
+                data[i + 2] = 0;  // B
+            }
+        }
+    };
+
+    // Undo last edit
+    const handleUndo = () => {
+        if (editHistory.length <= 1 || !canvasRef.current) return;
+
+        const ctx = canvasRef.current.getContext('2d');
+        if (!ctx) return;
+
+        // Remove current state and restore previous
+        const newHistory = [...editHistory];
+        newHistory.pop(); // Remove current
+        const previousState = newHistory[newHistory.length - 1];
+
+        ctx.putImageData(previousState, 0, 0);
+        setEditHistory(newHistory);
     };
 
 
@@ -376,10 +559,13 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
                             <canvas
                                 ref={overlayRef}
                                 className="absolute inset-0 w-full h-full cursor-crosshair touch-none"
-                                onMouseDown={handleMouseDown}
-                                onMouseMove={handleMouseMove}
-                                onMouseUp={handleMouseUp}
-                                onMouseLeave={handleMouseUp}
+                                onMouseDown={handlePointerDown}
+                                onMouseMove={handlePointerMove}
+                                onMouseUp={handlePointerUp}
+                                onMouseLeave={handlePointerUp}
+                                onTouchStart={handlePointerDown}
+                                onTouchMove={handlePointerMove}
+                                onTouchEnd={handlePointerUp}
                             />
                         </div>
                     </div>
@@ -387,17 +573,113 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
                     {/* Controls - 35% on desktop */}
                     <div className="w-full lg:w-[35%] border-t lg:border-l lg:border-t-0 border-white/10 bg-slate-900 overflow-y-auto p-4 sm:p-6 lg:pt-8 space-y-4 sm:space-y-6 max-h-[40vh] lg:max-h-none">
 
-                        {/* Presets */}
-                        <div className="space-y-4">
-                            <label className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Crop Presets</label>
-                            <div className="grid grid-cols-2 gap-3">
-                                <button onClick={() => applyPreset(1)} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 border border-white/5 transition">Square (1:1)</button>
-                                <button onClick={() => applyPreset(16 / 9)} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 border border-white/5 transition">16:9</button>
-                                <button onClick={() => applyPreset(4 / 3)} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 border border-white/5 transition">4:3</button>
-                                <button onClick={() => applyPreset(3 / 4)} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 border border-white/5 transition">3:4</button>
-                                <button onClick={() => setCrop(null)} className="px-3 py-2 bg-slate-800 hover:bg-red-500/20 text-red-300 border border-white/5 transition col-span-2">Reset Crop</button>
+                        {/* Selection Tool */}
+                        <div className="space-y-3">
+                            <label className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Selection Tool</label>
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg cursor-pointer hover:bg-slate-800 transition border border-white/5">
+                                    <input
+                                        type="radio"
+                                        name="selectionTool"
+                                        value="rectangle"
+                                        checked={selectionTool === 'rectangle'}
+                                        onChange={() => setSelectionTool('rectangle')}
+                                        className="w-4 h-4 text-purple-500 cursor-pointer"
+                                    />
+                                    <span className="text-white font-medium">Rectangle</span>
+                                </label>
+                                <label className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg cursor-pointer hover:bg-slate-800 transition border border-white/5">
+                                    <input
+                                        type="radio"
+                                        name="selectionTool"
+                                        value="circle"
+                                        checked={selectionTool === 'circle'}
+                                        onChange={() => setSelectionTool('circle')}
+                                        className="w-4 h-4 text-purple-500 cursor-pointer"
+                                    />
+                                    <span className="text-white font-medium">Circle</span>
+                                </label>
                             </div>
                         </div>
+
+                        {/* Edit Action */}
+                        <div className="space-y-3">
+                            <label className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Edit Action</label>
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg cursor-pointer hover:bg-slate-800 transition border border-white/5">
+                                    <input
+                                        type="radio"
+                                        name="editAction"
+                                        value="invert"
+                                        checked={editAction === 'invert'}
+                                        onChange={() => setEditAction('invert')}
+                                        className="w-4 h-4 text-purple-500 cursor-pointer"
+                                    />
+                                    <span className="text-white font-medium">Invert Colors</span>
+                                </label>
+                                <label className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg cursor-pointer hover:bg-slate-800 transition border border-white/5">
+                                    <input
+                                        type="radio"
+                                        name="editAction"
+                                        value="paintBlack"
+                                        checked={editAction === 'paintBlack'}
+                                        onChange={() => setEditAction('paintBlack')}
+                                        className="w-4 h-4 text-purple-500 cursor-pointer"
+                                    />
+                                    <span className="text-white font-medium">Paint Black</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Apply & Undo Buttons */}
+                        <div className="flex gap-2">
+                            <button
+                                onClick={applyEditAction}
+                                disabled={!currentSelection}
+                                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed rounded-lg text-white font-semibold transition flex items-center justify-center gap-2"
+                            >
+                                <Check className="w-4 h-4" />
+                                Apply
+                            </button>
+                            <button
+                                onClick={handleUndo}
+                                disabled={editHistory.length <= 1}
+                                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:cursor-not-allowed rounded-lg text-white font-semibold transition flex items-center justify-center gap-2"
+                            >
+                                <Undo2 className="w-4 h-4" />
+                                Undo
+                            </button>
+                        </div>
+
+                        {/* Enable Crop Checkbox */}
+                        <div className="border-t border-white/5 pt-4">
+                            <label className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg cursor-pointer hover:bg-slate-800 transition border border-white/5">
+                                <input
+                                    type="checkbox"
+                                    checked={enableCrop}
+                                    onChange={(e) => {
+                                        setEnableCrop(e.target.checked);
+                                        if (!e.target.checked) setCrop(null);
+                                    }}
+                                    className="w-4 h-4 text-purple-500 cursor-pointer rounded"
+                                />
+                                <span className="text-white font-semibold">Enable Crop</span>
+                            </label>
+                        </div>
+
+                        {/* Crop Presets - Only show when enabled */}
+                        {enableCrop && (
+                            <div className="space-y-4">
+                                <label className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Crop Presets</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button onClick={() => applyPreset(1)} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 border border-white/5 transition">Square (1:1)</button>
+                                    <button onClick={() => applyPreset(16 / 9)} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 border border-white/5 transition">16:9</button>
+                                    <button onClick={() => applyPreset(4 / 3)} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 border border-white/5 transition">4:3</button>
+                                    <button onClick={() => applyPreset(3 / 4)} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 border border-white/5 transition">3:4</button>
+                                    <button onClick={() => setCrop(null)} className="px-3 py-2 bg-slate-800 hover:bg-red-500/20 text-red-300 border border-white/5 transition col-span-2">Reset Crop</button>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Fine-tune Position Sliders */}
                         {crop && (
