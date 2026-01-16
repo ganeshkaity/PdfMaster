@@ -60,34 +60,72 @@ const PageThumbnail = ({
     canMoveUp: boolean,
     canMoveDown: boolean
 }) => {
+    const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [loaded, setLoaded] = useState(false);
-    const touchStartPos = useRef<{ x: number; y: number } | null>(null);
-    const [isTouchDragging, setIsTouchDragging] = useState(false);
-    const touchDragThreshold = 10; // Pixels to move before considering it a drag
+    const [isVisible, setIsVisible] = useState(false);
+    const [hasError, setHasError] = useState(false);
 
+    // Intersection Observer for lazy loading
     useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        setIsVisible(true);
+                    }
+                });
+            },
+            {
+                root: null, // viewport
+                rootMargin: '200px', // Start loading 200px before entering viewport
+                threshold: 0.01 // Trigger as soon as 1% is visible
+            }
+        );
+
+        observer.observe(container);
+
+        return () => {
+            observer.disconnect();
+        };
+    }, []);
+
+    // Render canvas when visible
+    useEffect(() => {
+        if (!isVisible || !pdfRef || loaded || hasError) return;
+
         let active = true;
         const render = async () => {
-            if (!pdfRef || loaded) return;
-            // Render small thumbnail
-            const canvas = await renderPageToCanvas(pdfRef, pageNum, 0.5, rotation || 0);
-            if (active && canvas && canvasRef.current) {
-                const ctx = canvasRef.current.getContext('2d');
-                if (ctx) {
-                    canvasRef.current.width = canvas.width;
-                    canvasRef.current.height = canvas.height;
-                    ctx.drawImage(canvas, 0, 0);
-                    setLoaded(true);
+            try {
+                // Render small thumbnail with reduced scale for memory efficiency
+                const canvas = await renderPageToCanvas(pdfRef, pageNum, 0.3, rotation || 0);
+                if (active && canvas && canvasRef.current) {
+                    const ctx = canvasRef.current.getContext('2d');
+                    if (ctx) {
+                        canvasRef.current.width = canvas.width;
+                        canvasRef.current.height = canvas.height;
+                        ctx.drawImage(canvas, 0, 0);
+                        setLoaded(true);
+                    }
+                }
+            } catch (error) {
+                console.error(`Failed to render page ${globalPageNum}:`, error);
+                if (active) {
+                    setHasError(true);
                 }
             }
         };
+
         render();
         return () => { active = false; };
-    }, [pdfRef, pageNum, rotation]);
+    }, [isVisible, pdfRef, pageNum, rotation, loaded, hasError, globalPageNum]);
 
     return (
         <div
+            ref={containerRef}
             onClick={onClick}
             draggable
             onDragStart={onDragStart}
@@ -100,8 +138,37 @@ const PageThumbnail = ({
             style={{ aspectRatio: '1 / 1.414' }}
         >
             <div className={`aspect-[1/1.41] bg-slate-900 flex items-center justify-center relative`}>
-                <canvas ref={canvasRef} className="w-full h-full object-contain" />
-                {!loaded && <span className="text-slate-500 text-xs">Loading...</span>}
+                {/* Canvas - hidden until loaded */}
+                <canvas 
+                    ref={canvasRef} 
+                    className={`w-full h-full object-contain transition-opacity ${loaded ? 'opacity-100' : 'opacity-0'}`} 
+                />
+                
+                {/* Loading State */}
+                {!loaded && !hasError && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        {isVisible ? (
+                            <div className="flex flex-col items-center gap-2">
+                                <div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+                                <span className="text-slate-500 text-xs">Loading...</span>
+                            </div>
+                        ) : (
+                            <div className="w-12 h-16 bg-slate-700/50 rounded animate-pulse"></div>
+                        )}
+                    </div>
+                )}
+
+                {/* Error State */}
+                {hasError && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="flex flex-col items-center gap-1 text-center px-2">
+                            <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span className="text-red-400 text-xs">Failed to load</span>
+                        </div>
+                    </div>
+                )}
 
                 {/* Overlay for selection state */}
                 <div className={`absolute inset-0 transition-opacity bg-cyan-500/10 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />

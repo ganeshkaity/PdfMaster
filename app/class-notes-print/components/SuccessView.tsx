@@ -27,6 +27,7 @@ interface SuccessViewProps {
     onDownload: (customFileName?: string) => void;
     onPreview: () => void;
     onProcessAnother: () => void;
+    onEditAgain: () => void;
 }
 
 export default function SuccessView({
@@ -36,7 +37,8 @@ export default function SuccessView({
     pageCount,
     onDownload,
     onPreview,
-    onProcessAnother
+    onProcessAnother,
+    onEditAgain
 }: SuccessViewProps) {
     const [isRenaming, setIsRenaming] = useState(false);
     const [editedName, setEditedName] = useState(fileName);
@@ -157,8 +159,15 @@ export default function SuccessView({
                         </div>
 
                         <button
+                            onClick={onEditAgain}
+                            className="text-slate-400 font-medium hover:text-white transition-colors flex items-center gap-2 text-sm pt-4 border-t border-white/5 w-full justify-center hover:border-white/10 mb-2"
+                        >
+                            <Edit2 className="w-4 h-4" /> Return to Edit
+                        </button>
+
+                        <button
                             onClick={onProcessAnother}
-                            className="text-slate-500 font-medium hover:text-white transition-colors flex items-center gap-2 text-sm pt-4 border-t border-white/5 w-full justify-center hover:border-white/10"
+                            className="text-slate-500 font-medium hover:text-white transition-colors flex items-center gap-2 text-sm w-full justify-center"
                         >
                             <ArrowLeft className="w-4 h-4" /> Process Another Document
                         </button>

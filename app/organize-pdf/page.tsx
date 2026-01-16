@@ -67,8 +67,9 @@ export default function OrganizePdfPage() {
 
         try {
             const pdfjs = await import("pdfjs-dist");
+            // Use local worker to ensure better compatibility and no CORS/CDN issues
             if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-                pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+                pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
             }
 
             const newFiles: AddedFile[] = [];
@@ -77,7 +78,12 @@ export default function OrganizePdfPage() {
 
             for (const file of files) {
                 const buffer = await file.arrayBuffer();
-                const pdf = await pdfjs.getDocument(buffer).promise;
+                const pdf = await pdfjs.getDocument({
+                    data: buffer,
+                    useWorkerFetch: false,
+                    isEvalSupported: false,
+                    useSystemFonts: true,
+                }).promise;
 
                 newFiles.push({
                     file,
@@ -299,6 +305,7 @@ export default function OrganizePdfPage() {
                         setSuccessData(null);
                         setProgressState({ percent: 0, current: 0, total: 0, estimatedTime: '' });
                     }}
+                    onEditAgain={() => setStep(1)}
                 />
             )}
 
@@ -307,30 +314,17 @@ export default function OrganizePdfPage() {
                 <PageEditModal
                     isOpen={true}
                     onClose={() => setEditingPage(null)}
-                    // We need to pass the file and page number to the modal
-                    // We have globalPageNum (editingPage)
-                    // We need to resolve it to fileIndex and localPageNum
-                    pdf={(() => {
-                        const fileIndex = pageToFileMap[editingPage];
-                        return addedFiles[fileIndex].pdfRef;
-                    })()}
+                    pdf={addedFiles[pageToFileMap[editingPage]].pdfRef}
                     pageNumber={(() => {
                         const fileIndex = pageToFileMap[editingPage];
-                        return editingPage - (
-                            // Calculate global start page of this file
-                            // Using cached logic or just subtract previous counts
-                            addedFiles.slice(0, fileIndex).reduce((acc, f) => acc + f.pageCount, 0)
-                        );
-                    })() + 1} // 1-based logic? PageEditModal rendering uses pageNumber directly with pdfjs. pdfjs uses 1-based.
-                    // My previous logic:
-                    // let local = editingPage;
-                    // for (let j=0; j<fileIndex; j++) local -= addedFiles[j].pageCount;
-                    // return local;
-                    // If editingPage is 1-based global.
-                    // If file 1 has 5 pages. editingPage=6 (File 2 Page 1).
-                    // local = 6 - 5 = 1.
-                    // So logic matches. 
-                    // I will replicate the loop logic inside IIFE or simplified reduce.
+                        // Calculate how many pages were in previous files
+                        const previousPagesCount = addedFiles
+                            .slice(0, fileIndex)
+                            .reduce((acc, f) => acc + f.pageCount, 0);
+
+                        // Convert global page (1-based) to local page (1-based)
+                        return editingPage - previousPagesCount;
+                    })()}
                     initialRotation={pageRotations[editingPage] || 0}
                     initialCrop={pageCrops[editingPage]}
                     onApply={(rotations, crop, editedImage) => {

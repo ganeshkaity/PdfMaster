@@ -22,7 +22,7 @@ export interface LogoRegion {
 export const initPdfJs = async () => {
   const pdfjs = await import("pdfjs-dist");
   if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-    pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+    pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
   }
   return pdfjs;
 };
@@ -48,6 +48,8 @@ export const renderPageToCanvas = async (
   await page.render({
     canvasContext: context,
     viewport: viewport,
+    // Use PDF.js's internal image decoder instead of browser's native decoder
+    renderInteractiveForms: false,
   } as any).promise;
 
   if (crop) {

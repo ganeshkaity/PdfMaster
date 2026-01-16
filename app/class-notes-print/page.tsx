@@ -96,8 +96,11 @@ export default function ClassNotesPrintPage() {
     const [quality, setQuality] = useState<'low' | 'medium' | 'high' | 'ultra' | 'original'>('high');
 
     // Color Filters
-    // Color Filters
     const [colorFilter, setColorFilter] = useState<'original' | 'auto-color' | 'light-text' | 'notes' | 'custom'>('original');
+
+    // Page Numbering
+    const [pageNumberType, setPageNumberType] = useState<'none' | 'slide' | 'page'>('none');
+    const [pageNumberPosition, setPageNumberPosition] = useState<'top' | 'bottom' | 'bottom-right' | 'top-right'>('bottom');
 
     // Preview
     const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -798,10 +801,93 @@ export default function ClassNotesPrintPage() {
                     doc.rect(x, y, cellWidth, cellHeight);
                 }
 
+                // Draw Page Numbers (Type: Slide)
+                if (pageNumberType === 'slide') {
+                    doc.setFontSize(10);
+                    doc.setTextColor(50, 50, 50); // Dark Gray
+
+                    const text = String(localPageNum); // Use local page number or global usage? Usually localized per PDF might be confusing if merged. Let's use global index (i+1) or just the page number from the file? 
+                    // Requirement: "page number for each cell". Usually users want sequential 1, 2, 3... for the handouts.
+                    // Let's use (i + 1) for sequential numbering of slides in the output.
+                    const textStr = String(i + 1);
+
+                    const textW = doc.getTextWidth(textStr);
+                    const textH = doc.getLineHeight() / 2.83465; // approx conversion points to mm?? No, font size is points, unit is mm. 
+                    // actually doc.setFontSize uses points. doc unit is mm.
+                    // 1 pt = 0.352778 mm.
+                    // Let's just rely on visual positioning.
+
+                    // Positions relative to Cell (x, y, cellWidth, cellHeight)
+                    let textX = x;
+                    let textY = y;
+                    const pad = 2; // mm padding
+
+                    switch (pageNumberPosition) {
+                        case 'top':
+                            textX = x + (cellWidth - textW) / 2;
+                            textY = y + 4;
+                            break;
+                        case 'bottom':
+                            textX = x + (cellWidth - textW) / 2;
+                            textY = y + cellHeight - 2;
+                            break;
+                        case 'top-right':
+                            textX = x + cellWidth - textW - pad;
+                            textY = y + 4;
+                            break;
+                        case 'bottom-right':
+                            textX = x + cellWidth - textW - pad;
+                            textY = y + cellHeight - 2;
+                            break;
+                    }
+
+                    doc.text(textStr, textX, textY);
+                }
+
                 currentSlot++;
 
                 if (currentSlot % slotsPerPage === 0 && i < selectedPages.length - 1) {
                     doc.addPage();
+                }
+            }
+
+            // Draw Page Numbers (Type: Page) - Global PDF Pages
+            if (pageNumberType === 'page') {
+                const totalPDFPages = doc.getNumberOfPages();
+                for (let p = 1; p <= totalPDFPages; p++) {
+                    doc.setPage(p);
+                    doc.setFontSize(10);
+                    doc.setTextColor(50, 50, 50);
+                    const textStr = String(p);
+                    const textW = doc.getTextWidth(textStr);
+
+                    // Page Dimensions
+                    const pW = doc.internal.pageSize.getWidth();
+                    const pH = doc.internal.pageSize.getHeight();
+                    const pad = 5;
+
+                    let tX = 0;
+                    let tY = 0;
+
+                    switch (pageNumberPosition) {
+                        case 'top':
+                            tX = (pW - textW) / 2;
+                            tY = pad * 2;
+                            break;
+                        case 'bottom':
+                            tX = (pW - textW) / 2;
+                            tY = pH - pad;
+                            break;
+                        case 'top-right':
+                            tX = pW - textW - pad;
+                            tY = pad * 2;
+                            break;
+                        case 'bottom-right':
+                            tX = pW - textW - pad;
+                            tY = pH - pad;
+                            break;
+                    }
+                    doc.text(textStr, tX, tY);
                 }
             }
 
@@ -1209,7 +1295,7 @@ export default function ClassNotesPrintPage() {
                                         </div>
                                     </div>
                                 </div>
-                                        {/* Visual Layout Preview */}
+                                {/* Visual Layout Preview */}
                                 <div className="bg-slate-950/50 rounded-xl p-4 flex items-center justify-center gap-6 border border-white/5">
                                     {/* Page Representation */}
                                     <div
@@ -1368,6 +1454,40 @@ export default function ClassNotesPrintPage() {
                                         </div>
                                     )}
                                 </div>
+
+                                {/* Page Numbering */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-3">Page Numbering</label>
+                                    <div className="space-y-3">
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {(['none', 'slide', 'page'] as const).map((t) => (
+                                                <button
+                                                    key={t}
+                                                    onClick={() => setPageNumberType(t)}
+                                                    className={`py-2 px-1 text-[10px] sm:text-xs font-medium rounded-lg border transition capitalize ${pageNumberType === t ? 'bg-purple-500/20 border-purple-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'}`}
+                                                >
+                                                    {t === 'none' ? 'None' : t === 'slide' ? 'Every Slide' : 'Every Page'}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {pageNumberType !== 'none' && (
+                                            <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    {(['top', 'top-right', 'bottom', 'bottom-right'] as const).map((p) => (
+                                                        <button
+                                                            key={p}
+                                                            onClick={() => setPageNumberPosition(p)}
+                                                            className={`py-2 px-2 text-[10px] sm:text-xs font-medium rounded-lg border transition capitalize ${pageNumberPosition === p ? 'bg-purple-500/20 border-purple-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'}`}
+                                                        >
+                                                            {p.replace('-', ' ')}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -1515,6 +1635,10 @@ export default function ClassNotesPrintPage() {
                         setColorFilter('original');
                         setPageRotations({}); // Reset page rotations
                         setPageCrops({}); // Reset page crops
+                    }}
+                    onEditAgain={() => {
+                        setStep(2); // Go back to customization
+                        setSuccessData(null); // Clear success data
                     }}
                 />
             )}
