@@ -79,6 +79,7 @@ export default function ClassNotesPrintPage() {
     // Page Editing (Rotation)
     const [pageRotations, setPageRotations] = useState<Record<number, number>>({});
     const [pageCrops, setPageCrops] = useState<Record<number, CropRegion>>({});
+    const [pageEdits, setPageEdits] = useState<Record<number, string>>({}); // Store edited canvas as DataURL
     const [editingPage, setEditingPage] = useState<number | null>(null);
 
     // Logo Removal
@@ -440,7 +441,7 @@ export default function ClassNotesPrintPage() {
         setEditingPage(pageNum);
     };
 
-    const handleEditApply = (rotation: number, crop?: CropRegion) => {
+    const handleEditApply = (rotation: number, crop?: CropRegion, editedImage?: string) => {
         if (editingPage === null) return;
         setPageRotations(prev => ({ ...prev, [editingPage]: rotation }));
         if (crop) {
@@ -451,6 +452,11 @@ export default function ClassNotesPrintPage() {
             delete newCrops[editingPage];
             setPageCrops(newCrops);
         }
+
+        if (editedImage) {
+            setPageEdits(prev => ({ ...prev, [editingPage]: editedImage }));
+        }
+
         setEditingPage(null);
     };
 
@@ -521,9 +527,45 @@ export default function ClassNotesPrintPage() {
         }
 
         // Render base page
+        // Render base page or use edited image
         const rotation = pageRotations[previewPage] || 0;
         const crop = pageCrops[previewPage];
-        const canvas = await renderPageToCanvas(fileData.pdfRef, localPageNum, 0.8, rotation, crop);
+        const editedImgData = pageEdits[previewPage];
+
+        let canvas: HTMLCanvasElement | null = null;
+
+        if (editedImgData) {
+            // Use edited image (already rotated)
+            const img = new Image();
+            img.src = editedImgData;
+            await new Promise((resolve) => { img.onload = resolve; });
+
+            const baseCanvas = document.createElement('canvas');
+            baseCanvas.width = img.width;
+            baseCanvas.height = img.height;
+            const baseCtx = baseCanvas.getContext('2d');
+            baseCtx?.drawImage(img, 0, 0);
+
+            if (crop) {
+                // Apply crop to edited image
+                const croppedCanvas = document.createElement('canvas');
+                const cw = (crop.width / 100) * baseCanvas.width;
+                const ch = (crop.height / 100) * baseCanvas.height;
+                const cx = (crop.x / 100) * baseCanvas.width;
+                const cy = (crop.y / 100) * baseCanvas.height;
+
+                croppedCanvas.width = cw;
+                croppedCanvas.height = ch;
+                const croppedCtx = croppedCanvas.getContext('2d');
+                croppedCtx?.drawImage(baseCanvas, cx, cy, cw, ch, 0, 0, cw, ch);
+                canvas = croppedCanvas;
+            } else {
+                canvas = baseCanvas;
+            }
+        } else {
+            // Standard render from PDF
+            canvas = await renderPageToCanvas(fileData.pdfRef, localPageNum, 0.8, rotation, crop);
+        }
         if (!canvas || !previewCanvasRef.current) return;
 
         const ctx = previewCanvasRef.current.getContext('2d');
@@ -565,7 +607,7 @@ export default function ClassNotesPrintPage() {
         if (step === 2) {
             renderLivePreview();
         }
-    }, [step, filters, isBlackAndWhite, logoRegion, isLogoRemovalEnabled, previewPage, logoFillType, logoFillColor, logoBlurStrength, colorFilter]);
+    }, [step, filters, isBlackAndWhite, logoRegion, isLogoRemovalEnabled, previewPage, logoFillType, logoFillColor, logoBlurStrength, colorFilter, pageEdits, pageCrops, pageRotations]);
 
 
     // --- Output Generation ---
@@ -674,7 +716,41 @@ export default function ClassNotesPrintPage() {
                 };
                 const rotation = pageRotations[globalPageNum] || 0;
                 const crop = pageCrops[globalPageNum];
-                const canvas = await renderPageToCanvas(fileData.pdfRef, localPageNum, getScale(), rotation, crop);
+                const editedImgData = pageEdits[globalPageNum];
+
+                let canvas: HTMLCanvasElement | null = null;
+
+                if (editedImgData) {
+                    // Use edited image
+                    const img = new Image();
+                    img.src = editedImgData;
+                    await new Promise((resolve) => { img.onload = resolve; });
+
+                    const baseCanvas = document.createElement('canvas');
+                    baseCanvas.width = img.width;
+                    baseCanvas.height = img.height;
+                    const baseCtx = baseCanvas.getContext('2d');
+                    baseCtx?.drawImage(img, 0, 0);
+
+                    if (crop) {
+                        const croppedCanvas = document.createElement('canvas');
+                        const cw = (crop.width / 100) * baseCanvas.width;
+                        const ch = (crop.height / 100) * baseCanvas.height;
+                        const cx = (crop.x / 100) * baseCanvas.width;
+                        const cy = (crop.y / 100) * baseCanvas.height;
+
+                        croppedCanvas.width = cw;
+                        croppedCanvas.height = ch;
+                        const croppedCtx = croppedCanvas.getContext('2d');
+                        croppedCtx?.drawImage(baseCanvas, cx, cy, cw, ch, 0, 0, cw, ch);
+                        canvas = croppedCanvas;
+                    } else {
+                        canvas = baseCanvas;
+                    }
+                } else {
+                    canvas = await renderPageToCanvas(fileData.pdfRef, localPageNum, getScale(), rotation, crop);
+                }
+
                 if (!canvas) continue;
 
                 // Apply logic

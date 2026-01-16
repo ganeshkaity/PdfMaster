@@ -14,7 +14,7 @@ interface PageEditModalProps {
     initialCrop?: CropRegion;
     isOpen: boolean;
     onClose: () => void;
-    onApply: (rotation: number, crop?: CropRegion) => void;
+    onApply: (rotation: number, crop?: CropRegion, editedImage?: string) => void;
 }
 
 export default function PageEditModal({ pdf, pageNumber, initialRotation, initialCrop, isOpen, onClose, onApply }: PageEditModalProps) {
@@ -975,7 +975,11 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
                     <button onClick={onClose} className="px-6 py-2.5 text-slate-400 hover:text-white font-medium transition">
                         Cancel
                     </button>
-                    <button onClick={() => onApply(rotation, crop || undefined)} className="px-8 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-xl shadow-lg hover:shadow-cyan-500/25 transition">
+                    <button onClick={() => {
+                        const canvas = canvasRef.current;
+                        const editedImage = canvas ? canvas.toDataURL('image/png') : undefined;
+                        onApply(rotation, crop || undefined, editedImage);
+                    }} className="px-8 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-xl shadow-lg hover:shadow-cyan-500/25 transition">
                         Apply Changes
                     </button>
                 </div>
