@@ -98,16 +98,52 @@ export const applyFiltersToCanvas = (
   // Helper to check if a pixel is "dark" (for background removal)
   const isDark = (r: number, g: number, b: number) => (r + g + b) / 3 < 128;
 
+
+  // Detect background color by sampling interior regions (not corners)
+  let bgColor = { r: 255, g: 255, b: 255 }; // Default white
+  if (options.removeBackground) {
+    // Sample interior regions to avoid black borders/edges
+    const samples: { r: number; g: number; b: number }[] = [];
+    const margin = 0.15; // Sample 15% from edges
+    const samplePositions = [
+      { x: Math.floor(width * margin), y: Math.floor(height * margin) },           // Top-left interior
+      { x: Math.floor(width * (1 - margin)), y: Math.floor(height * margin) },     // Top-right interior
+      { x: Math.floor(width * margin), y: Math.floor(height * (1 - margin)) },     // Bottom-left interior
+      { x: Math.floor(width * (1 - margin)), y: Math.floor(height * (1 - margin)) }, // Bottom-right interior
+      { x: Math.floor(width * 0.5), y: Math.floor(height * margin) },              // Top-center
+      { x: Math.floor(width * 0.5), y: Math.floor(height * (1 - margin)) },        // Bottom-center
+    ];
+
+    samplePositions.forEach(pos => {
+      const idx = (pos.y * width + pos.x) * 4;
+      if (idx < data.length) {
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+
+        // Only sample if it's a light color (not black edges)
+        // Skip dark pixels to avoid detecting black borders as background
+        if (r + g + b > 200) {  // Only sample light pixels
+          samples.push({ r, g, b });
+        }
+      }
+    });
+
+    // Average the valid samples to get background color
+    if (samples.length > 0) {
+      bgColor = {
+        r: Math.round(samples.reduce((sum, s) => sum + s.r, 0) / samples.length),
+        g: Math.round(samples.reduce((sum, s) => sum + s.g, 0) / samples.length),
+        b: Math.round(samples.reduce((sum, s) => sum + s.b, 0) / samples.length)
+      };
+    }
+  }
+
   for (let i = 0; i < data.length; i += 4) {
     let r = data[i];
     let g = data[i + 1];
     let b = data[i + 2];
 
-    // Remove Background (Simple placeholder logic)
-    if (options.removeBackground) {
-      // Boost contrast slightly to clean mostly-white backgrounds
-      // Actual elaborate background removal is complex, keeping simple contrast boost
-    }
 
     // Grayscale
     if (options.grayscale) {
@@ -140,11 +176,46 @@ export const applyFiltersToCanvas = (
       b = gray + (b - gray) * (options.saturation / 100);
     }
 
-    // Invert Colors (Last)
+    // Invert Colors
     if (options.invert) {
       r = 255 - r;
       g = 255 - g;
       b = 255 - b;
+    }
+
+    // Remove Background - Apply AFTER inversion for correct behavior
+    if (options.removeBackground) {
+      let targetBg = bgColor;
+
+      // If inverted, invert the detected background color too
+      if (options.invert) {
+        targetBg = {
+          r: 255 - bgColor.r,
+          g: 255 - bgColor.g,
+          b: 255 - bgColor.b
+        };
+      }
+
+      // Calculate color distance from target background
+      const distance = Math.sqrt(
+        Math.pow(r - targetBg.r, 2) +
+        Math.pow(g - targetBg.g, 2) +
+        Math.pow(b - targetBg.b, 2)
+      );
+
+      // If similar to background, convert to white (or black if inverted)
+      const tolerance = 40;
+      if (distance < tolerance) {
+        if (options.invert) {
+          r = 0;  // Black background for inverted
+          g = 0;
+          b = 0;
+        } else {
+          r = 255;  // White background for normal
+          g = 255;
+          b = 255;
+        }
+      }
     }
 
     data[i] = r;

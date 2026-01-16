@@ -96,7 +96,7 @@ export default function ClassNotesPrintPage() {
 
     // Color Filters
     // Color Filters
-    const [colorFilter, setColorFilter] = useState<'original' | 'auto-color' | 'light-text' | 'hd' | 'custom'>('original');
+    const [colorFilter, setColorFilter] = useState<'original' | 'auto-color' | 'light-text' | 'notes' | 'custom'>('original');
 
     // Preview
     const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -540,7 +540,7 @@ export default function ClassNotesPrintPage() {
         switch (colorFilter) {
             case 'auto-color': activeFilters.contrast = 115; activeFilters.brightness = 110; activeFilters.saturation = 100; break;
             case 'light-text': activeFilters.contrast = 130; activeFilters.brightness = 125; activeFilters.saturation = 90; break;
-            case 'hd': activeFilters.contrast = 120; activeFilters.brightness = 105; activeFilters.saturation = 110; break;
+            case 'notes': activeFilters.saturation = 57; activeFilters.contrast = 147; activeFilters.brightness = 116; break;
             case 'custom': /* Use sliders */ break;
             case 'original': default: activeFilters.contrast = 100; activeFilters.brightness = 100; activeFilters.saturation = 100; break;
         }
@@ -618,7 +618,7 @@ export default function ClassNotesPrintPage() {
             switch (colorFilter) {
                 case 'auto-color': activeFilters.contrast = 115; activeFilters.brightness = 110; activeFilters.saturation = 100; break;
                 case 'light-text': activeFilters.contrast = 130; activeFilters.brightness = 125; activeFilters.saturation = 90; break;
-                case 'hd': activeFilters.contrast = 120; activeFilters.brightness = 105; activeFilters.saturation = 110; break;
+                case 'notes': activeFilters.saturation = 57; activeFilters.contrast = 147; activeFilters.brightness = 116; break;
                 case 'custom': /* Use sliders */ break;
                 case 'original': default: activeFilters.contrast = 100; activeFilters.brightness = 100; activeFilters.saturation = 100; break;
             }
@@ -989,7 +989,7 @@ export default function ClassNotesPrintPage() {
                                     </h3>
                                     <div className="bg-slate-950/50 rounded-xl border border-white/5 p-4">
                                         <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-800 overflow-x-auto custom-scrollbar">
-                                            {(['original', 'auto-color', 'light-text', 'hd', 'custom'] as const).map((f) => (
+                                            {(['original', 'auto-color', 'light-text', 'notes', 'custom'] as const).map((f) => (
                                                 <button
                                                     key={f}
                                                     onClick={() => setColorFilter(f)}
