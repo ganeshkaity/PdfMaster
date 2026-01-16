@@ -970,7 +970,7 @@ export default function ClassNotesPrintPage() {
                                             <div className="p-4 bg-slate-950/50 rounded-xl border border-white/5 space-y-4">
                                                 <div>
                                                     <label className="block text-xs font-medium text-slate-500 mb-2">Fill Method</label>
-                                                    <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-800">
+                                                    <div className="grid grid-cols-1 sm:flex bg-slate-900 rounded-lg p-1 border border-slate-800 gap-1 sm:gap-0">
                                                         {(['white', 'black', 'custom', 'blur'] as const).map((type) => (
                                                             <button
                                                                 key={type}
@@ -1037,7 +1037,7 @@ export default function ClassNotesPrintPage() {
                                         <Settings2 className="w-5 h-5 text-purple-400" /> Output Quality
                                     </h3>
                                     <div className="bg-slate-950/50 rounded-xl border border-white/5 p-4">
-                                        <div className="grid grid-cols-5 gap-1 bg-slate-900 rounded-lg p-1 border border-slate-800">
+                                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-1 bg-slate-900 rounded-lg p-1 border border-slate-800">
                                             {(['low', 'medium', 'high', 'ultra', 'original'] as const).map((q) => (
                                                 <button
                                                     key={q}
@@ -1066,7 +1066,7 @@ export default function ClassNotesPrintPage() {
                                         <Wand2 className="w-5 h-5 text-purple-400" /> Color Filters
                                     </h3>
                                     <div className="bg-slate-950/50 rounded-xl border border-white/5 p-4">
-                                        <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-800 overflow-x-auto custom-scrollbar">
+                                        <div className="grid grid-cols-1 sm:flex bg-slate-900 rounded-lg p-1 border border-slate-800 sm:overflow-x-auto custom-scrollbar gap-1 sm:gap-0">
                                             {(['original', 'auto-color', 'light-text', 'notes', 'custom'] as const).map((f) => (
                                                 <button
                                                     key={f}
@@ -1141,40 +1141,6 @@ export default function ClassNotesPrintPage() {
                                     <Layout className="w-5 h-5 text-purple-400" /> Layout
                                 </h3>
 
-                                {/* Visual Layout Preview */}
-                                <div className="bg-slate-950/50 rounded-xl p-4 flex items-center justify-center gap-6 border border-white/5">
-                                    {/* Page Representation */}
-                                    <div
-                                        className="border-2 border-slate-700 bg-slate-900 shadow-xl relative transition-all duration-300 flex-shrink-0"
-                                        style={{
-                                            width: layout.orientation === 'portrait' ? '120px' : '170px',
-                                            height: layout.orientation === 'portrait' ? '170px' : '120px',
-                                            display: 'grid',
-                                            gridTemplateColumns: `repeat(${layout.slidesPerCol}, 1fr)`,
-                                            gridTemplateRows: `repeat(${layout.slidesPerRow}, 1fr)`,
-                                            padding: '6px',
-                                            gap: '4px'
-                                        }}
-                                    >
-                                        {Array.from({ length: layout.slidesPerRow * layout.slidesPerCol }).map((_, i) => (
-                                            <div key={i} className="border border-purple-500/50 bg-purple-500/10 rounded-[2px]" />
-                                        ))}
-                                    </div>
-
-                                    {/* Text Info */}
-                                    <div className="text-center">
-                                        <div className="text-5xl font-bold text-cyan-400 mb-1">
-                                            {layout.slidesPerRow * layout.slidesPerCol}
-                                        </div>
-                                        <div className="text-sm text-slate-300 font-medium">
-                                            {layout.slidesPerRow} × {layout.slidesPerCol} slides
-                                        </div>
-                                        <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">
-                                            per page
-                                        </div>
-                                    </div>
-                                </div>
-
                                 {/* Document Size */}
                                 <div>
                                     <label className="block text-sm font-medium text-slate-300 mb-3">Document Size</label>
@@ -1243,7 +1209,39 @@ export default function ClassNotesPrintPage() {
                                         </div>
                                     </div>
                                 </div>
+                                        {/* Visual Layout Preview */}
+                                <div className="bg-slate-950/50 rounded-xl p-4 flex items-center justify-center gap-6 border border-white/5">
+                                    {/* Page Representation */}
+                                    <div
+                                        className="border-2 border-slate-700 bg-slate-900 shadow-xl relative transition-all duration-300 flex-shrink-0"
+                                        style={{
+                                            width: layout.orientation === 'portrait' ? '120px' : '170px',
+                                            height: layout.orientation === 'portrait' ? '170px' : '120px',
+                                            display: 'grid',
+                                            gridTemplateColumns: `repeat(${layout.slidesPerCol}, 1fr)`,
+                                            gridTemplateRows: `repeat(${layout.slidesPerRow}, 1fr)`,
+                                            padding: '6px',
+                                            gap: '4px'
+                                        }}
+                                    >
+                                        {Array.from({ length: layout.slidesPerRow * layout.slidesPerCol }).map((_, i) => (
+                                            <div key={i} className="border border-purple-500/50 bg-purple-500/10 rounded-[2px]" />
+                                        ))}
+                                    </div>
 
+                                    {/* Text Info */}
+                                    <div className="text-center">
+                                        <div className="text-5xl font-bold text-cyan-400 mb-1">
+                                            {layout.slidesPerRow * layout.slidesPerCol}
+                                        </div>
+                                        <div className="text-sm text-slate-300 font-medium">
+                                            {layout.slidesPerRow} × {layout.slidesPerCol} slides
+                                        </div>
+                                        <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">
+                                            per page
+                                        </div>
+                                    </div>
+                                </div>
                                 {/* Separation Lines */}
                                 <div>
                                     <label className="block text-sm font-medium text-slate-300 mb-3">Add Separation Lines</label>
