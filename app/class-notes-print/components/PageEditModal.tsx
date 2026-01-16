@@ -730,8 +730,8 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
                         {/* Lock Button */}
                         <button
                             onClick={() => setIsLocked(!isLocked)}
-                            className={`p-1.5 sm:p-2 hover:bg-white/10 rounded-lg transition ${isLocked ? 'text-yellow-400 bg-yellow-500/20' : 'text-slate-300'}`}
-                            title={isLocked ? "Unlock Pan/Drag" : "Lock Pan/Drag"}
+                            className={`p-1.5 sm:p-2 hover:bg-white/10 rounded-lg transition ${!isLocked ? 'text-blue-400 bg-blue-500/20' : 'text-slate-300'}`}
+                            title={isLocked ? "Unlock (Pan Mode)" : "Lock (Edit Mode)"}
                         >
                             {isLocked ? '🔒' : '🔓'}
                         </button>
@@ -767,7 +767,18 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
                     </div>
 
                     {/* Controls - 35% on desktop */}
-                    <div className="w-full lg:w-[35%] border-t lg:border-l lg:border-t-0 border-white/10 bg-slate-900 overflow-y-auto p-4 sm:p-6 lg:pt-8 space-y-4 sm:space-y-6 max-h-[40vh] lg:max-h-none">
+                    <div className={`w-full lg:w-[35%] border-t lg:border-l lg:border-t-0 border-white/10 bg-slate-900 p-4 sm:p-6 lg:pt-8 space-y-4 sm:space-y-6 max-h-[40vh] lg:max-h-none relative ${!isLocked ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+
+                        {/* Overlay when unlocked (pan mode) */}
+                        {!isLocked && (
+                            <div className="absolute inset-0 z-10 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-6">
+                                <div className="text-center space-y-3">
+                                    <div className="text-6xl">🔒</div>
+                                    <p className="text-lg font-semibold text-white">Lock zoom and pan to use Edit features</p>
+                                    <p className="text-sm text-slate-400">Click the lock button to enable editing</p>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Selection Tool */}
                         <div className="space-y-3">
