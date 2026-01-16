@@ -148,7 +148,7 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
 
             // Draw selection border (blue dashed)
             ctx.strokeStyle = '#3B82F6'; // Blue
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 5;
             ctx.setLineDash([8, 4]); // Dashed line
 
             if (tool === 'rectangle') {
@@ -166,7 +166,7 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
             ctx.setLineDash([]); // Reset
 
             // Draw corner handles (small blue squares)
-            const handleSize = 8;
+            const handleSize = 30;
             ctx.fillStyle = '#3B82F6';
 
             // Top-left
@@ -194,17 +194,17 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
             ctx.clearRect(xPx, yPx, wPx, hPx);
 
             // Animated dashed border (marching ants)
-            ctx.strokeStyle = '#f97316'; // Orange for crop
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#00da3eff'; // Orange for crop
+            ctx.lineWidth = 5;
             ctx.setLineDash([8, 4]); // Dashed line
             ctx.lineDashOffset = -(Date.now() / 20) % 12; // Animated offset
             ctx.strokeRect(xPx, yPx, wPx, hPx);
             ctx.setLineDash([]); // Reset
 
             // Draw handle dots (circles)
-            const dotSize = 10;
-            ctx.fillStyle = '#ffffff';
-            ctx.strokeStyle = '#f97316';
+            const dotSize = 20;
+            ctx.fillStyle = '#abe48aff';
+            ctx.strokeStyle = '#04fa00ff';
             ctx.lineWidth = 2;
 
             const drawDot = (x: number, y: number) => {
@@ -261,6 +261,7 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
 
 
 
+
     // Crop interaction state
     const [cropInteraction, setCropInteraction] = useState<{
         type: 'move' | 'resize-tl' | 'resize-tr' | 'resize-bl' | 'resize-br' | 'none';
@@ -268,6 +269,14 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
         startY: number;
         startCrop: CropRegion;
     }>({ type: 'none', startX: 0, startY: 0, startCrop: { x: 0, y: 0, width: 0, height: 0 } });
+
+    // Selection interaction state
+    const [selectionInteraction, setSelectionInteraction] = useState<{
+        type: 'move' | 'resize-tl' | 'resize-tr' | 'resize-bl' | 'resize-br' | 'none';
+        startX: number;
+        startY: number;
+        startSelection: { x: number; y: number; width: number; height: number; tool: 'rectangle' | 'circle' };
+    }>({ type: 'none', startX: 0, startY: 0, startSelection: { x: 0, y: 0, width: 0, height: 0, tool: 'rectangle' } });
 
     // Start drawing selection or crop interaction
     const handlePointerDown = (e: MouseEvent<HTMLCanvasElement> | TouchEvent<HTMLCanvasElement>) => {
@@ -306,10 +315,37 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
                 setCropInteraction({ type: 'move', startX: coords.x, startY: coords.y, startCrop: crop });
             }
         } else {
-            // Selection mode: start drawing selection
-            setIsDrawing(true);
-            setDrawStart(coords);
-            setCurrentSelection(null);
+            // Selection mode
+            if (currentSelection) {
+                // Check if clicking on existing selection to move/resize
+                const { x, y, width, height } = currentSelection;
+                const handleSize = 20;
+                const hit = (hx: number, hy: number) => Math.abs(coords.x - hx) <= handleSize && Math.abs(coords.y - hy) <= handleSize;
+
+                // Check corner handles
+                if (hit(x, y)) {
+                    setSelectionInteraction({ type: 'resize-tl', startX: coords.x, startY: coords.y, startSelection: currentSelection });
+                } else if (hit(x + width, y)) {
+                    setSelectionInteraction({ type: 'resize-tr', startX: coords.x, startY: coords.y, startSelection: currentSelection });
+                } else if (hit(x, y + height)) {
+                    setSelectionInteraction({ type: 'resize-bl', startX: coords.x, startY: coords.y, startSelection: currentSelection });
+                } else if (hit(x + width, y + height)) {
+                    setSelectionInteraction({ type: 'resize-br', startX: coords.x, startY: coords.y, startSelection: currentSelection });
+                } else if (coords.x >= x && coords.x <= x + width && coords.y >= y && coords.y <= y + height) {
+                    // Inside selection - move
+                    setSelectionInteraction({ type: 'move', startX: coords.x, startY: coords.y, startSelection: currentSelection });
+                } else {
+                    // Outside selection - start new
+                    setIsDrawing(true);
+                    setDrawStart(coords);
+                    setCurrentSelection(null);
+                }
+            } else {
+                // No selection - start drawing new
+                setIsDrawing(true);
+                setDrawStart(coords);
+                setCurrentSelection(null);
+            }
         }
     };
 
@@ -371,20 +407,70 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
 
             setCrop(newCrop);
         } else {
-            // Selection mode: update selection bounds
-            if (!isDrawing || !drawStart) return;
+            // Selection mode
+            if (selectionInteraction.type !== 'none' && overlayRef.current) {
+                // Moving or resizing existing selection
+                const coords = getCoords(e);
+                const dx = coords.x - selectionInteraction.startX;
+                const dy = coords.y - selectionInteraction.startY;
 
-            const coords = getCoords(e);
-            const width = coords.x - drawStart.x;
-            const height = coords.y - drawStart.y;
+                const wCanvas = overlayRef.current.width;
+                const hCanvas = overlayRef.current.height;
 
-            setCurrentSelection({
-                x: width < 0 ? coords.x : drawStart.x,
-                y: height < 0 ? coords.y : drawStart.y,
-                width: Math.abs(width),
-                height: Math.abs(height),
-                tool: selectionTool
-            });
+                let newSelection = { ...selectionInteraction.startSelection };
+
+                const clamp = (val: number, min: number, max: number) => Math.min(Math.max(val, min), max);
+
+                switch (selectionInteraction.type) {
+                    case 'move':
+                        newSelection.x = clamp(newSelection.x + dx, 0, wCanvas - newSelection.width);
+                        newSelection.y = clamp(newSelection.y + dy, 0, hCanvas - newSelection.height);
+                        break;
+                    case 'resize-tl':
+                        newSelection.x += dx;
+                        newSelection.width -= dx;
+                        newSelection.y += dy;
+                        newSelection.height -= dy;
+                        break;
+                    case 'resize-tr':
+                        newSelection.y += dy;
+                        newSelection.height -= dy;
+                        newSelection.width += dx;
+                        break;
+                    case 'resize-bl':
+                        newSelection.x += dx;
+                        newSelection.width -= dx;
+                        newSelection.height += dy;
+                        break;
+                    case 'resize-br':
+                        newSelection.width += dx;
+                        newSelection.height += dy;
+                        break;
+                }
+
+                // Bounds checking
+                if (newSelection.width < 10) newSelection.width = 10;
+                if (newSelection.height < 10) newSelection.height = 10;
+                if (newSelection.x < 0) newSelection.x = 0;
+                if (newSelection.y < 0) newSelection.y = 0;
+                if (newSelection.x + newSelection.width > wCanvas) newSelection.width = wCanvas - newSelection.x;
+                if (newSelection.y + newSelection.height > hCanvas) newSelection.height = hCanvas - newSelection.y;
+
+                setCurrentSelection(newSelection);
+            } else if (isDrawing && drawStart) {
+                // Drawing new selection
+                const coords = getCoords(e);
+                const width = coords.x - drawStart.x;
+                const height = coords.y - drawStart.y;
+
+                setCurrentSelection({
+                    x: width < 0 ? coords.x : drawStart.x,
+                    y: height < 0 ? coords.y : drawStart.y,
+                    width: Math.abs(width),
+                    height: Math.abs(height),
+                    tool: selectionTool
+                });
+            }
         }
     };
 
@@ -395,6 +481,7 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
         } else {
             setIsDrawing(false);
             setDrawStart(null);
+            setSelectionInteraction({ type: 'none', startX: 0, startY: 0, startSelection: { x: 0, y: 0, width: 0, height: 0, tool: 'rectangle' } });
         }
     };
 
