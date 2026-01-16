@@ -47,7 +47,9 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
     // Zoom and Pan controls
     const [zoomLevel, setZoomLevel] = useState(1);
     const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
-    const [isLocked, setIsLocked] = useState(false);
+    const [isLocked, setIsLocked] = useState(true); // Default locked = normal editing mode
+    const [isPanning, setIsPanning] = useState(false);
+    const [panStart, setPanStart] = useState<{ x: number; y: number; offsetX: number; offsetY: number } | null>(null);
 
     // Initialize state when modal opens
     useEffect(() => {
@@ -59,7 +61,7 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
             setEnableCrop(!!initialCrop);
             setZoomLevel(1);
             setPanOffset({ x: 0, y: 0 });
-            setIsLocked(false);
+            setIsLocked(true); // Reset to locked (normal editing)
         }
     }, [isOpen, initialRotation, initialCrop, pageNumber]);
 
@@ -288,6 +290,26 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
 
     // Start drawing selection or crop interaction
     const handlePointerDown = (e: MouseEvent<HTMLCanvasElement> | TouchEvent<HTMLCanvasElement>) => {
+        // When unlocked (🔓) - Pan mode only (disable all editing)
+        // When locked (🔒) - Normal editing mode (crop/selection)
+
+        if (!isLocked && zoomLevel > 1) {
+            // Pan mode - unlocked and zoomed
+            const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+            const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+            setIsPanning(true);
+            setPanStart({
+                x: clientX,
+                y: clientY,
+                offsetX: panOffset.x,
+                offsetY: panOffset.y
+            });
+            return;
+        }
+
+        // Locked mode - normal editing (crop/selection)
+        if (!isLocked) return; // If unlocked but not zoomed, do nothing
+
         const coords = getCoords(e);
 
         if (enableCrop) {
@@ -369,6 +391,19 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
 
     // Update selection or crop while dragging
     const handlePointerMove = (e: MouseEvent<HTMLCanvasElement> | TouchEvent<HTMLCanvasElement>) => {
+        // Handle panning
+        if (isPanning && panStart) {
+            const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+            const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+            const dx = clientX - panStart.x;
+            const dy = clientY - panStart.y;
+            setPanOffset({
+                x: panStart.offsetX + dx / zoomLevel,
+                y: panStart.offsetY + dy / zoomLevel
+            });
+            return;
+        }
+
         if (enableCrop) {
             // Crop mode: resize/move crop box
             if (cropInteraction.type === 'none' || !crop || !overlayRef.current) return;
@@ -508,6 +543,13 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
 
     // Finish drawing selection or crop interaction
     const handlePointerUp = () => {
+        // Stop panning
+        if (isPanning) {
+            setIsPanning(false);
+            setPanStart(null);
+            return;
+        }
+
         if (enableCrop) {
             setCropInteraction({ type: 'none', startX: 0, startY: 0, startCrop: { x: 0, y: 0, width: 0, height: 0 } });
         } else {
