@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, ChevronDown, FileText, Settings, Image as ImageIcon, Slice, Move, Shield } from "lucide-react";
 
 const tools = [
-    { name: "Edit PDF", href: "/edit-pdf", icon: FileText },
+    { name: "Write Text on PDF", href: "/text-on-pdf", icon: FileText },
     { name: "Compress PDF", href: "/compress-pdf", icon: Settings },
     { name: "Merge PDFs", href: "/merge-pdf", icon: FileText },
     { name: "Split PDF", href: "/split-pdf", icon: Slice },

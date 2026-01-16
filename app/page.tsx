@@ -34,9 +34,9 @@ const allTools = [
     icon: Minimize2
   },
   {
-    title: "Edit PDF",
+    title: "Write Text on PDF",
     description: "Add text, shapes, and images to your PDF pages.",
-    href: "/edit-pdf",
+    href: "/text-on-pdf",
     icon: FileCog
   },
   {
