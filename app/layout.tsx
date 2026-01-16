@@ -12,6 +12,11 @@ export const metadata: Metadata = {
   description: "Allyono Apps - Free online PDF tools for editing, converting, compressing, and managing PDF files. All processing happens locally in your browser - secure, fast, and private.",
   other: {
     "google-adsense-account": "ca-pub-4661155459361916"
+  },
+  icons: {
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png',
   }
 };
 
