@@ -264,7 +264,7 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
 
     // Crop interaction state
     const [cropInteraction, setCropInteraction] = useState<{
-        type: 'move' | 'resize-tl' | 'resize-tr' | 'resize-bl' | 'resize-br' | 'none';
+        type: 'move' | 'resize-tl' | 'resize-tr' | 'resize-bl' | 'resize-br' | 'resize-t' | 'resize-b' | 'resize-l' | 'resize-r' | 'none';
         startX: number;
         startY: number;
         startCrop: CropRegion;
@@ -301,7 +301,7 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
             const handleSize = 20; // Larger hit area for touch
             const hit = (hx: number, hy: number) => Math.abs(coords.x - hx) <= handleSize && Math.abs(coords.y - hy) <= handleSize;
 
-            // Check corner handles
+            // Check corner handles first
             if (hit(xPx, yPx)) {
                 setCropInteraction({ type: 'resize-tl', startX: coords.x, startY: coords.y, startCrop: crop });
             } else if (hit(xPx + wPx, yPx)) {
@@ -310,6 +310,16 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
                 setCropInteraction({ type: 'resize-bl', startX: coords.x, startY: coords.y, startCrop: crop });
             } else if (hit(xPx + wPx, yPx + hPx)) {
                 setCropInteraction({ type: 'resize-br', startX: coords.x, startY: coords.y, startCrop: crop });
+            }
+            // Check midpoint handles
+            else if (hit(xPx + wPx / 2, yPx)) {
+                setCropInteraction({ type: 'resize-t', startX: coords.x, startY: coords.y, startCrop: crop });
+            } else if (hit(xPx + wPx / 2, yPx + hPx)) {
+                setCropInteraction({ type: 'resize-b', startX: coords.x, startY: coords.y, startCrop: crop });
+            } else if (hit(xPx, yPx + hPx / 2)) {
+                setCropInteraction({ type: 'resize-l', startX: coords.x, startY: coords.y, startCrop: crop });
+            } else if (hit(xPx + wPx, yPx + hPx / 2)) {
+                setCropInteraction({ type: 'resize-r', startX: coords.x, startY: coords.y, startCrop: crop });
             } else if (coords.x >= xPx && coords.x <= xPx + wPx && coords.y >= yPx && coords.y <= yPx + hPx) {
                 // Inside crop box - move
                 setCropInteraction({ type: 'move', startX: coords.x, startY: coords.y, startCrop: crop });
@@ -394,6 +404,20 @@ export default function PageEditModal({ pdf, pageNumber, initialRotation, initia
                 case 'resize-br':
                     newCrop.width += dxPct;
                     newCrop.height += dyPct;
+                    break;
+                case 'resize-t':
+                    newCrop.y += dyPct;
+                    newCrop.height -= dyPct;
+                    break;
+                case 'resize-b':
+                    newCrop.height += dyPct;
+                    break;
+                case 'resize-l':
+                    newCrop.x += dxPct;
+                    newCrop.width -= dxPct;
+                    break;
+                case 'resize-r':
+                    newCrop.width += dxPct;
                     break;
             }
 
