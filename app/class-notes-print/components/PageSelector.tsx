@@ -88,6 +88,7 @@ const PageThumbnail = ({
 
     return (
         <div
+            onClick={onClick}
             draggable
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
@@ -121,14 +122,12 @@ const PageThumbnail = ({
                 {isSelected ? (
                     <div
                         className="bg-cyan-500 text-white rounded-full p-1 sm:p-2 shadow-lg cursor-pointer hover:bg-cyan-600 transition"
-                        onClick={onClick}
                     >
                         <Check className="w-3 h-3 sm:w-4 sm:h-4" />
                     </div>
                 ) : (
                     <div
                         className="bg-slate-900/80 text-slate-400 rounded-full p-1 sm:p-2 border border-white/10 group-hover:border-white/50 cursor-pointer hover:bg-slate-800 transition"
-                        onClick={onClick}
                     >
                         <div className="w-3 h-3 sm:w-4 sm:h-4" />
                     </div>

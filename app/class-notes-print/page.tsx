@@ -905,8 +905,8 @@ export default function ClassNotesPrintPage() {
                                         {/* Clear BG */}
                                         <div className="flex items-center justify-between p-3 bg-slate-950/50 rounded-xl border border-white/5">
                                             <div>
-                                                <p className="font-medium text-slate-200">Clear PDF Background</p>
-                                                <p className="text-xs text-slate-500">Remove background noise</p>
+                                                <p className="font-medium text-slate-200">Smart PDF Background</p>
+                                                <p className="text-xs text-slate-500">Ai enhanced noise removal</p>
                                             </div>
                                             <input
                                                 type="checkbox"
