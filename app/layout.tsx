@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
+import ServiceWorkerRegister from "./components/ServiceWorkerRegister";
 import { Toaster } from "react-hot-toast";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -17,7 +18,12 @@ export const metadata: Metadata = {
     icon: '/logo.png',
     shortcut: '/logo.png',
     apple: '/logo.png',
-  }
+  },
+  manifest: '/manifest.json',
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0F2236",
 };
 
 export default function RootLayout({
@@ -54,6 +60,8 @@ export default function RootLayout({
             }
           }}
         />
+        <ServiceWorkerRegister />
+
       </body>
     </html>
   );

@@ -1,0 +1,112 @@
+{
+    "id": "/",
+    "name": "PDFixr – Free All-in-One PDF Tools",
+    "short_name": "PDFixr",
+    "description": "PDFixr by AllyonoApps is an free all-in-one PDF editor and creator. Merge, split, compress, convert, edit, print, remove logos, and customize PDFs securely — 100% free, no watermarks, fully client-side.",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "any",
+    "background_color": "#0F2236",
+    "theme_color": "#0F172A",
+    "lang": "en",
+    "dir": "ltr",
+    "categories": [
+        "productivity",
+        "utilities",
+        "education",
+        "tools"
+    ],
+    "icons": [
+        {
+            "src": "/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icons/icon-maskable.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "/screenshots/mobile-1.png",
+            "sizes": "1080x1920",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "All PDF tools in one place"
+        },
+        {
+            "src": "/screenshots/mobile-2.png",
+            "sizes": "1080x1920",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "Enhance, Revert Colour and Convert Black and White to Color instantly"
+        },
+        {
+            "src": "/screenshots/mobile-3.png",
+            "sizes": "1080x1920",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "Customize your pdf as you want"
+        },
+        {
+            "src": "/screenshots/mobile-4.png",
+            "sizes": "1080x1920",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "All types of tools for Pdf in one place"
+        },
+        {
+            "src": "/screenshots/mobile-5.png",
+            "sizes": "1080x1920",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "Remove logos and watermarks"
+        },
+        {
+            "src": "/screenshots/mobile-6.png",
+            "sizes": "1080x1920",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "Select pdf pages or reorder or remove"
+        },
+        {
+            "src": "/screenshots/mobile-7.png",
+            "sizes": "1080x1920",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "Edit and Crop Pdf pages instantly"
+        },
+        {
+            "src": "/screenshots/mobile-8.png",
+            "sizes": "1080x1920",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "Download optimized PDFs instantly and securely"
+        },
+        {
+            "src": "/screenshots/desktop-1.png",
+            "sizes": "1440x900",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "Desktop dashboard with all PDF tools"
+        },
+        {
+            "src": "/screenshots/desktop-2.png",
+            "sizes": "1440x900",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "Advanced PDF editor on desktop"
+        }
+    ]
+}
