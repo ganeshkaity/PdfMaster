@@ -210,6 +210,7 @@ export default function EditPdfPage() {
                         setFile(null);
                         setSuccessData(null);
                     }}
+                    onEditAgain={() => setStep(1)}
                 />
             )}
         </ToolLayout>
