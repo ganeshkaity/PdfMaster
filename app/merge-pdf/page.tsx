@@ -8,6 +8,7 @@ import { PDFDocument } from "pdf-lib";
 import { saveAs } from "file-saver";
 import toast from "react-hot-toast";
 import { Reorder, useDragControls, motion, AnimatePresence } from "framer-motion";
+import { usePWAFile } from "../hooks/usePWAFile";
 
 interface PdfFile {
     id: string;
@@ -18,6 +19,10 @@ interface PdfFile {
 export default function MergePdfPage() {
     const [files, setFiles] = useState<PdfFile[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
+
+    usePWAFile((file) => {
+        handleFilesSelected([file]);
+    });
 
     const handleFilesSelected = async (newFiles: File[]) => {
         const newPdfFiles = newFiles.map((file) => ({

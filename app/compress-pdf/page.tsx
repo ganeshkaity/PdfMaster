@@ -8,12 +8,17 @@ import { PDFDocument } from "pdf-lib";
 import { saveAs } from "file-saver";
 import toast from "react-hot-toast";
 import { motion } from "framer-motion";
+import { usePWAFile } from "../hooks/usePWAFile";
 
 export default function CompressPdfPage() {
     const [file, setFile] = useState<File | null>(null);
     const [compressionLevel, setCompressionLevel] = useState<"low" | "medium" | "high">("medium");
     const [isProcessing, setIsProcessing] = useState(false);
     const [resultSize, setResultSize] = useState<number | null>(null);
+
+    usePWAFile((file) => {
+        handleFileSelected([file]);
+    });
 
     const handleFileSelected = (files: File[]) => {
         if (files.length > 0) setFile(files[0]);

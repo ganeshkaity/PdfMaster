@@ -8,7 +8,7 @@
     "display": "standalone",
     "orientation": "any",
     "background_color": "#0F2236",
-    "theme_color": "#0F172A",
+    "theme_color": "#0F2236",
     "lang": "en",
     "dir": "ltr",
     "categories": [
@@ -16,6 +16,17 @@
         "utilities",
         "education",
         "tools"
+    ],
+    "file_handlers": [
+        {
+            "action": "/open",
+            "accept": {
+                "application/pdf": [".pdf"],
+                "image/png": [".png"],
+                "image/jpeg": [".jpg", ".jpeg"],
+                "image/webp": [".webp"]
+            }
+        }
     ],
     "icons": [
         {
@@ -109,4 +120,5 @@
             "label": "Advanced PDF editor on desktop"
         }
     ]
+    
 }

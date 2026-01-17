@@ -7,11 +7,16 @@ import { RefreshCcw, File as FileIcon, Loader2, Download, RotateCw } from "lucid
 import { PDFDocument, degrees } from "pdf-lib";
 import { saveAs } from "file-saver";
 import toast from "react-hot-toast";
+import { usePWAFile } from "../hooks/usePWAFile";
 
 export default function RotatePdfPage() {
     const [file, setFile] = useState<File | null>(null);
     const [rotation, setRotation] = useState(0);
     const [isProcessing, setIsProcessing] = useState(false);
+
+    usePWAFile((file) => {
+        handleFileSelected([file]);
+    });
 
     const handleFileSelected = (files: File[]) => {
         if (files.length > 0) setFile(files[0]);

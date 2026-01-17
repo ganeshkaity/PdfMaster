@@ -8,7 +8,7 @@ import {
   FileCode, FileImage, Layers
 } from "lucide-react";
 
-const allTools = [
+export const allTools = [
   {
     title: "Merge PDF",
     description: "Combine multiple PDFs into a single file. Order them however you like.",

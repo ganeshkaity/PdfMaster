@@ -13,6 +13,7 @@ import StepsIndicator from "../class-notes-print/components/StepsIndicator";
 import ProcessingView from "../class-notes-print/components/ProcessingView";
 import SuccessView from "../class-notes-print/components/SuccessView";
 import PdfEditor from "./components/PdfEditor";
+import { usePWAFile } from "../hooks/usePWAFile";
 
 interface TextOverlay {
     id: string;
@@ -53,6 +54,11 @@ export default function EditPdfPage() {
         formattedSize: string;
         pageCount: number;
     } | null>(null);
+
+
+    usePWAFile((file) => {
+        handleFileSelected([file]);
+    });
 
 
     const handleFileSelected = (files: File[]) => {

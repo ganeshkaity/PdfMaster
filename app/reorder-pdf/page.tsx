@@ -1,7 +1,15 @@
 "use client";
 
-import MergePdfPage from "../merge-pdf/page";
+import { useState } from "react";
+import OrganizePdfPage from "../organize-pdf/page";
+import { usePWAFile } from "../hooks/usePWAFile";
 
 export default function ReorderPdfPage() {
-    return <MergePdfPage />;
+    const [pwaFile, setPwaFile] = useState<File | undefined>(undefined);
+
+    usePWAFile((file) => {
+        setPwaFile(file);
+    });
+
+    return <OrganizePdfPage initialFile={pwaFile} />;
 }

@@ -8,6 +8,7 @@ import { PDFDocument, PageSizes } from "pdf-lib";
 import { saveAs } from "file-saver";
 import toast from "react-hot-toast";
 import { Reorder, AnimatePresence, motion } from "framer-motion";
+import { usePWAFile } from "../hooks/usePWAFile";
 
 interface ImageFile {
     id: string;
@@ -20,6 +21,10 @@ export default function JpgToPdfPage() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [pageSize, setPageSize] = useState<"a4" | "fit">("a4");
     const [orientation, setOrientation] = useState<"portrait" | "landscape">("portrait");
+
+    usePWAFile((file) => {
+        handleFilesSelected([file]);
+    });
 
     const handleFilesSelected = (newFiles: File[]) => {
         const newImageFiles = newFiles.map((file) => ({

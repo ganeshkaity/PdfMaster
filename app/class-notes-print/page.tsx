@@ -16,6 +16,7 @@ import StepsIndicator from "./components/StepsIndicator";
 import ProcessingView from "./components/ProcessingView";
 import SuccessView from "./components/SuccessView";
 import PageEditModal, { CropRegion } from "./components/PageEditModal";
+import { usePWAFile } from "../hooks/usePWAFile";
 
 export default function ClassNotesPrintPage() {
     // Pipeline Steps: 0 = Upload, 1 = Select Pages, 2 = Configure/Preview
@@ -44,6 +45,10 @@ export default function ClassNotesPrintPage() {
         formattedSize: string;
         pageCount: number;
     } | null>(null);
+
+    usePWAFile((file) => {
+        handleFileSelected([file]);
+    });
 
     // Enhancement / Filters
     const [filters, setFilters] = useState<FilterOptions>({

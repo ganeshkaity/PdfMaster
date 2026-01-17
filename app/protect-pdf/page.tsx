@@ -7,11 +7,16 @@ import { Lock, File as FileIcon, Loader2, Download, ShieldCheck } from "lucide-r
 import { PDFDocument } from "pdf-lib";
 import { saveAs } from "file-saver";
 import toast from "react-hot-toast";
+import { usePWAFile } from "../hooks/usePWAFile";
 
 export default function ProtectPdfPage() {
     const [file, setFile] = useState<File | null>(null);
     const [password, setPassword] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
+
+    usePWAFile((file) => {
+        handleFileSelected([file]);
+    });
 
     const handleFileSelected = (files: File[]) => {
         if (files.length > 0) setFile(files[0]);

@@ -7,6 +7,7 @@ import { Layers } from "lucide-react"; // Icon for Organize
 import { PDFDocument, rgb, degrees } from "pdf-lib";
 import { saveAs } from "file-saver";
 import toast from "react-hot-toast";
+import { usePWAFile } from "../hooks/usePWAFile";
 
 // Components from class-notes-print (Reused)
 import StepsIndicator from "../class-notes-print/components/StepsIndicator";
@@ -32,9 +33,15 @@ const formatBytes = (bytes: number, decimals = 2) => {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 };
 
-export default function OrganizePdfPage() {
+export default function OrganizePdfPage({ initialFile }: { initialFile?: File }) {
     const [step, setStep] = useState(0);
     const [addedFiles, setAddedFiles] = useState<AddedFile[]>([]);
+
+    useEffect(() => {
+        if (initialFile) {
+            handleFilesSelected([initialFile]);
+        }
+    }, [initialFile]);
 
     // Page Management State
     const [totalPages, setTotalPages] = useState(0);
@@ -61,6 +68,10 @@ export default function OrganizePdfPage() {
         formattedSize: string;
         pageCount: number;
     } | null>(null);
+
+    usePWAFile((file) => {
+        handleFilesSelected([file]);
+    });
 
     const handleFilesSelected = async (files: File[]) => {
         if (files.length === 0) return;
@@ -335,4 +346,4 @@ export default function OrganizePdfPage() {
         </ToolLayout>
     );
 }
-                           // just a text to pust on github as refresh
+// just a text to pust on github as refresh

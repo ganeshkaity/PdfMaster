@@ -9,6 +9,7 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import toast from "react-hot-toast";
 import { renderPageToCanvas } from "../utils/class-notes-utils";
+import { usePWAFile } from "../hooks/usePWAFile";
 
 
 
@@ -55,6 +56,11 @@ export default function SplitPdfPage() {
     } | null>(null);
 
 
+
+    // PWA Auto-load
+    usePWAFile((file) => {
+        handleFileSelected([file]);
+    });
 
     // File Selection Handler
     const handleFileSelected = async (newFiles: File[]) => {

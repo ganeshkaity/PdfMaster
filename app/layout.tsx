@@ -20,6 +20,11 @@ export const metadata: Metadata = {
     apple: '/logo.png',
   },
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "PDFixr",
+  },
 };
 
 export const viewport: Viewport = {

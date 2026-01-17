@@ -8,12 +8,17 @@ import mammoth from "mammoth";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import toast from "react-hot-toast";
+import { usePWAFile } from "../hooks/usePWAFile";
 
 export default function WordToPdfPage() {
     const [file, setFile] = useState<File | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const previewRef = useRef<HTMLDivElement>(null);
     const [htmlContent, setHtmlContent] = useState("");
+
+    usePWAFile((file) => {
+        handleFileSelected([file]);
+    });
 
     const handleFileSelected = (files: File[]) => {
         if (files.length > 0) setFile(files[0]);

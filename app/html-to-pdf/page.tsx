@@ -6,11 +6,19 @@ import { Code, File as FileIcon, Loader2, Download, MonitorPlay } from "lucide-r
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import toast from "react-hot-toast";
+import { usePWAFile } from "../hooks/usePWAFile";
 
 export default function HtmlToPdfPage() {
     const [htmlCode, setHtmlCode] = useState("<h1>Hello World</h1>\n<p>This is a sample HTML content.</p>");
     const [isProcessing, setIsProcessing] = useState(false);
     const previewRef = useRef<HTMLDivElement>(null);
+
+    usePWAFile(async (file) => {
+        if (file) {
+            const text = await file.text();
+            setHtmlCode(text);
+        }
+    });
 
     const handleConvert = async () => {
         if (!previewRef.current) return;

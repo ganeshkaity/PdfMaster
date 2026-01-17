@@ -7,10 +7,15 @@ import { Crop, File as FileIcon, Loader2, Download } from "lucide-react";
 import { PDFDocument } from "pdf-lib";
 import { saveAs } from "file-saver";
 import toast from "react-hot-toast";
+import { usePWAFile } from "../hooks/usePWAFile";
 
 export default function CropPdfPage() {
     const [file, setFile] = useState<File | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
+
+    usePWAFile((file) => {
+        handleFileSelected([file]);
+    });
 
     // Crop margins in points (1/72 inch)
     const [top, setTop] = useState(0);

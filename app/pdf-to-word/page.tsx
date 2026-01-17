@@ -6,6 +6,7 @@ import FileDropZone from "../components/tools/FileDropZone";
 import { FileText, File as FileIcon, Loader2, Download } from "lucide-react";
 import { saveAs } from "file-saver";
 import toast from "react-hot-toast";
+import { usePWAFile } from "../hooks/usePWAFile";
 
 // Force dynamic rendering to prevent SSR
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,10 @@ export default function PdfToWordPage() {
     const [file, setFile] = useState<File | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const pdfjsRef = useRef<any>(null);
+
+    usePWAFile((file) => {
+        handleFileSelected([file]);
+    });
 
     useEffect(() => {
         import('pdfjs-dist').then((pdfjs) => {

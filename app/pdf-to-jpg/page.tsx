@@ -7,6 +7,7 @@ import { Image as ImageIcon, File as FileIcon, Loader2, Download, Layers } from 
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import toast from "react-hot-toast";
+import { usePWAFile } from "../hooks/usePWAFile";
 
 // Force dynamic rendering to prevent SSR
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,10 @@ export default function PdfToJpgPage() {
     const [pageCount, setPageCount] = useState<number>(0);
     const [progress, setProgress] = useState(0);
     const pdfjsRef = useRef<any>(null);
+
+    usePWAFile((file) => {
+        handleFileSelected([file]);
+    });
 
     useEffect(() => {
         // Dynamically import pdfjs-dist only on client side

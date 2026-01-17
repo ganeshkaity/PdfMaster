@@ -7,6 +7,7 @@ import { Image as ImageIcon, File as FileIcon, Loader2, Download } from "lucide-
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import toast from "react-hot-toast";
+import { usePWAFile } from "../hooks/usePWAFile";
 
 // Force dynamic rendering to prevent SSR
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,10 @@ export default function PdfToPngPage() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState(0);
     const pdfjsRef = useRef<any>(null);
+
+    usePWAFile((file) => {
+        handleFileSelected([file]);
+    });
 
     useEffect(() => {
         import('pdfjs-dist').then((pdfjs) => {
